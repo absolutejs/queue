@@ -34,30 +34,33 @@ import {
 // (no hand-written job map, no generics) and validated at enqueue + dequeue.
 // Build schemas with `t` from this package so they share one TypeBox instance.
 const jobs = defineJobs({
-	'email.recap': t.Object({ accountId: t.String() }),
-	'match.ping': t.Object({ matchId: t.String() })
+	'email.send': t.Object({ to: t.String(), subject: t.String() }),
+	'webhook.deliver': t.Object({ url: t.String(), body: t.Unknown() })
 });
 
 const store = createInMemoryJobStore(jobs);
 const registry = createJobRegistry(jobs)
-	.on('email.recap', async ({ accountId }) => {
-		// accountId: string — inferred from the schema
+	.on('email.send', async ({ to, subject }) => {
+		// to: string, subject: string — inferred from the schema
 	})
-	.on('match.ping', async ({ matchId }, { attempts }) => {
-		// nudge the match…
+	.on('webhook.deliver', async ({ url, body }, { attempts }) => {
+		// retried automatically; `attempts` is which try this is
 	});
 
 const app = new Elysia()
 	.use(queue({ registry, store })) // in-process worker auto-starts
-	.post('/recap/:id', ({ params, queue }) =>
-		queue.enqueue('email.recap', { accountId: params.id })
+	.post('/welcome/:email', ({ params, queue }) =>
+		queue.enqueue('email.send', {
+			subject: 'Welcome',
+			to: params.email
+		})
 	)
-	.post('/ping/:id', ({ params, queue }) =>
-		// delayed one-shot: run in 14 days
+	.post('/notify', ({ body, queue }) =>
+		// delayed one-shot: deliver the webhook in 1 hour
 		queue.enqueue(
-			'match.ping',
-			{ matchId: params.id },
-			{ runAt: Date.now() + 14 * 24 * 60 * 60 * 1000 }
+			'webhook.deliver',
+			{ body, url: 'https://example.com/hook' },
+			{ runAt: Date.now() + 60 * 60 * 1000 }
 		)
 	)
 	.listen(3000);
@@ -70,9 +73,13 @@ import { cron } from '@elysiajs/cron';
 
 app.use(
 	cron({
-		name: 'weekly-recap',
+		name: 'weekly-digest',
 		pattern: '0 8 * * 1', // Mondays at 08:00
-		run: () => store.enqueue({ kind: 'email.recap', payload: { accountId } })
+		run: () =>
+			store.enqueue({
+				kind: 'email.send',
+				payload: { subject: 'Weekly digest', to: 'team@example.com' }
+			})
 	})
 );
 ```
