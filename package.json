@@ -1,0 +1,50 @@
+{
+	"name": "@absolutejs/queue",
+	"version": "0.0.1",
+	"description": "A durable, typed job queue for Elysia and the AbsoluteJS ecosystem",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/absolutejs/queue.git"
+	},
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"type": "module",
+	"license": "CC BY-NC 4.0",
+	"author": "Alex Kahn",
+	"keywords": [
+		"queue",
+		"jobs",
+		"background-jobs",
+		"worker",
+		"absolutejs",
+		"elysia",
+		"bun"
+	],
+	"scripts": {
+		"build": "rm -rf dist && bun build src/index.ts --outdir dist --sourcemap --target=bun --external elysia && tsc --project tsconfig.build.json",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"format": "prettier --write \"./**/*.{ts,json,md}\"",
+		"release": "bun run format && bun run build && bun publish"
+	},
+	"peerDependencies": {
+		"elysia": ">= 1.4.26"
+	},
+	"devDependencies": {
+		"@types/bun": "1.2.9",
+		"elysia": "1.4.26",
+		"prettier": "3.5.3",
+		"typescript": "5.8.3"
+	},
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md"
+	]
+}
