@@ -4,6 +4,9 @@
   "workspaces": {
     "": {
       "name": "@absolutejs/queue",
+      "dependencies": {
+        "@sinclair/typebox": "^0.34.0",
+      },
       "devDependencies": {
         "@types/bun": "1.2.9",
         "elysia": "1.4.26",

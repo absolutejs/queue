@@ -1,15 +1,19 @@
+import { Type as t } from '@sinclair/typebox';
 import { describe, expect, it } from 'bun:test';
+import { defineJobs } from '../src/defineJobs';
 import { createInMemoryJobStore } from '../src/inMemoryJobStore';
 import { createJobRegistry } from '../src/registry';
 import { runQueueWorker } from '../src/standaloneWorker';
 
-type Jobs = { 'math.add': { left: number; right: number } };
+const jobs = defineJobs({
+	'math.add': t.Object({ left: t.Number(), right: t.Number() })
+});
 
 describe('runQueueWorker', () => {
 	it('starts a polling worker that drains the queue, then stops', async () => {
-		const store = createInMemoryJobStore<Jobs>();
+		const store = createInMemoryJobStore(jobs);
 		let ran = 0;
-		const registry = createJobRegistry<Jobs>().on('math.add', () => {
+		const registry = createJobRegistry(jobs).on('math.add', () => {
 			ran += 1;
 		});
 

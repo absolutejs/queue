@@ -1,3 +1,4 @@
+import { TypeCompiler } from '@sinclair/typebox/compiler';
 import { exponentialBackoff } from './backoff';
 import {
 	DEFAULT_CONCURRENCY,
@@ -10,6 +11,11 @@ import type {
 	JobMap,
 	QueueWorker
 } from './types';
+import {
+	collectPayloadIssues,
+	QueuePayloadValidationError,
+	type JobValidators
+} from './validation';
 
 export const createQueueWorker = <Jobs extends JobMap>({
 	backoff = exponentialBackoff(),
@@ -25,6 +31,15 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	let active = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 
+	// Compile a validator per kind so a job whose persisted payload no longer
+	// matches the schema (stale data, schema drift) is dead-lettered instead of
+	// crashing the handler.
+	const validators: JobValidators = new Map();
+	for (const kind of registry.kinds()) {
+		const schema = registry.getSchema(kind);
+		if (schema) validators.set(String(kind), TypeCompiler.Compile(schema));
+	}
+
 	const runJob = async (job: Job<Jobs>) => {
 		const handler = registry.getHandler(job.kind);
 		if (!handler) {
@@ -32,6 +47,23 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				dead: true,
 				error: `No handler registered for kind "${String(job.kind)}"`
 			});
+
+			return;
+		}
+
+		const issues = collectPayloadIssues(
+			validators.get(String(job.kind)),
+			job.payload
+		);
+		if (issues) {
+			await store.fail(job.id, {
+				dead: true,
+				error: `Payload validation failed: ${issues.join('; ')}`
+			});
+			onError?.(
+				new QueuePayloadValidationError(String(job.kind), issues),
+				job
+			);
 
 			return;
 		}

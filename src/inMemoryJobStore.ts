@@ -1,14 +1,21 @@
 import { DEFAULT_MAX_ATTEMPTS } from './constants';
 import { createJobId } from './ids';
-import type { Job, JobId, JobMap, JobStatus, JobStore } from './types';
+import type {
+	Job,
+	JobDefinition,
+	JobId,
+	JobMapFromDefinition,
+	JobStatus,
+	JobStore
+} from './types';
+import { assertValidPayload, compileJobValidators } from './validation';
 
-const cloneJob = <Jobs extends JobMap>(job: Job<Jobs>): Job<Jobs> => ({
-	...job
-});
-
-export const createInMemoryJobStore = <
-	Jobs extends JobMap
->(): JobStore<Jobs> => {
+export const createInMemoryJobStore = <const Def extends JobDefinition>(
+	definition: Def
+): JobStore<JobMapFromDefinition<Def>> => {
+	type Jobs = JobMapFromDefinition<Def>;
+	const cloneJob = (job: Job<Jobs>): Job<Jobs> => ({ ...job });
+	const validators = compileJobValidators(definition);
 	const jobs = new Map<JobId, Job<Jobs>>();
 
 	const findByIdempotencyKey = (key: string) => {
@@ -23,6 +30,26 @@ export const createInMemoryJobStore = <
 	};
 
 	return {
+		cancel: async (id) => {
+			const job = jobs.get(id);
+			if (
+				!job ||
+				job.status === 'done' ||
+				job.status === 'dead' ||
+				job.status === 'canceled'
+			)
+				return false;
+
+			jobs.set(id, {
+				...job,
+				lockedAt: undefined,
+				lockedBy: undefined,
+				status: 'canceled',
+				updatedAt: Date.now()
+			});
+
+			return true;
+		},
 		claimDue: async ({ limit, now, workerId }) => {
 			const due = [...jobs.values()]
 				.filter((job) => job.status === 'pending' && job.runAt <= now)
@@ -48,7 +75,25 @@ export const createInMemoryJobStore = <
 
 			jobs.set(id, { ...job, status: 'done', updatedAt: Date.now() });
 		},
+		countByStatus: async () => {
+			const counts: Record<JobStatus, number> = {
+				canceled: 0,
+				claimed: 0,
+				dead: 0,
+				done: 0,
+				pending: 0
+			};
+			for (const job of jobs.values()) counts[job.status] += 1;
+
+			return counts;
+		},
 		enqueue: async (input) => {
+			assertValidPayload(
+				validators.get(String(input.kind)),
+				String(input.kind),
+				input.payload
+			);
+
 			if (input.idempotencyKey) {
 				const existing = findByIdempotencyKey(input.idempotencyKey);
 				if (existing) return existing.id;
@@ -87,50 +132,6 @@ export const createInMemoryJobStore = <
 				updatedAt: Date.now()
 			});
 		},
-		listByKind: async (kind, options) => {
-			const matched = [...jobs.values()].filter(
-				(job) =>
-					job.kind === kind &&
-					(options?.status ? job.status === options.status : true)
-			);
-			const limited = options?.limit
-				? matched.slice(0, options.limit)
-				: matched;
-
-			return limited.map(cloneJob) as Job<Jobs, typeof kind>[];
-		},
-		cancel: async (id) => {
-			const job = jobs.get(id);
-			if (
-				!job ||
-				job.status === 'done' ||
-				job.status === 'dead' ||
-				job.status === 'canceled'
-			)
-				return false;
-
-			jobs.set(id, {
-				...job,
-				lockedAt: undefined,
-				lockedBy: undefined,
-				status: 'canceled',
-				updatedAt: Date.now()
-			});
-
-			return true;
-		},
-		countByStatus: async () => {
-			const counts: Record<JobStatus, number> = {
-				canceled: 0,
-				claimed: 0,
-				dead: 0,
-				done: 0,
-				pending: 0
-			};
-			for (const job of jobs.values()) counts[job.status] += 1;
-
-			return counts;
-		},
 		get: async (id) => {
 			const job = jobs.get(id);
 
@@ -150,22 +151,17 @@ export const createInMemoryJobStore = <
 
 			return matched.slice(offset, offset + limit).map(cloneJob);
 		},
-		retry: async (id) => {
-			const job = jobs.get(id);
-			if (!job) return false;
+		listByKind: async (kind, options) => {
+			const matched = [...jobs.values()].filter(
+				(job) =>
+					job.kind === kind &&
+					(options?.status ? job.status === options.status : true)
+			);
+			const limited = options?.limit
+				? matched.slice(0, options.limit)
+				: matched;
 
-			jobs.set(id, {
-				...job,
-				attempts: 0,
-				lastError: undefined,
-				lockedAt: undefined,
-				lockedBy: undefined,
-				runAt: Date.now(),
-				status: 'pending',
-				updatedAt: Date.now()
-			});
-
-			return true;
+			return limited.map(cloneJob) as Job<Jobs, typeof kind>[];
 		},
 		reapStuck: async ({ leaseMs, now }) => {
 			let reaped = 0;
@@ -186,6 +182,23 @@ export const createInMemoryJobStore = <
 				}
 
 			return reaped;
+		},
+		retry: async (id) => {
+			const job = jobs.get(id);
+			if (!job) return false;
+
+			jobs.set(id, {
+				...job,
+				attempts: 0,
+				lastError: undefined,
+				lockedAt: undefined,
+				lockedBy: undefined,
+				runAt: Date.now(),
+				status: 'pending',
+				updatedAt: Date.now()
+			});
+
+			return true;
 		}
 	};
 };

@@ -1,3 +1,5 @@
+export { Type as t } from '@sinclair/typebox';
+export type { Static, TSchema } from '@sinclair/typebox';
 export { exponentialBackoff } from './backoff';
 export type { ExponentialBackoffOptions } from './backoff';
 export {
@@ -9,6 +11,7 @@ export {
 	DEFAULT_MAX_ATTEMPTS,
 	DEFAULT_POLL_INTERVAL_MS
 } from './constants';
+export { defineJobs } from './defineJobs';
 export { createJobId } from './ids';
 export { createInMemoryJobStore } from './inMemoryJobStore';
 export { queue } from './plugin';
@@ -22,7 +25,6 @@ export { createQueueRoutes } from './routes';
 export type { QueueRoutesOptions } from './routes';
 export { runQueueWorker } from './standaloneWorker';
 export type { RunQueueWorkerOptions } from './standaloneWorker';
-export { createQueueWorker } from './worker';
 export type {
 	BackoffStrategy,
 	ClaimDueOptions,
@@ -31,9 +33,11 @@ export type {
 	FailOptions,
 	Job,
 	JobContext,
+	JobDefinition,
 	JobHandler,
 	JobId,
 	JobMap,
+	JobMapFromDefinition,
 	JobRegistry,
 	JobStatus,
 	JobStore,
@@ -42,3 +46,11 @@ export type {
 	QueueWorker,
 	ReapStuckOptions
 } from './types';
+export {
+	assertValidPayload,
+	collectPayloadIssues,
+	compileJobValidators,
+	QueuePayloadValidationError
+} from './validation';
+export type { JobValidators } from './validation';
+export { createQueueWorker } from './worker';

@@ -8,9 +8,9 @@ It does **not** reinvent cron — pair it with
 [`@elysiajs/cron`](https://elysiajs.com/plugins/cron) for recurring triggers. Cron
 decides *when*; the queue guarantees the work *happens* (once, surviving restarts).
 
-> Status: early (`0.0.1`). Core (in-memory store, registry, worker, Elysia plugin) is
-> in place; the Postgres adapter (`@absolutejs/queue-postgres`) and admin routes are
-> next. See `PLAN.md`.
+> Status: early (`0.0.2`). In-memory store, schema-defined typed registry, worker,
+> Elysia plugin, admin routes, and a standalone worker runner. Production store:
+> [`@absolutejs/queue-postgres`](https://github.com/absolutejs/queue-adapters).
 
 ## Install
 
@@ -25,18 +25,23 @@ import { Elysia } from 'elysia';
 import {
 	createInMemoryJobStore,
 	createJobRegistry,
-	queue
+	defineJobs,
+	queue,
+	t
 } from '@absolutejs/queue';
 
-type Jobs = {
-	'email.recap': { accountId: string };
-	'match.ping': { matchId: string };
-};
+// Define jobs once: kind -> payload schema. Payload types are inferred from this
+// (no hand-written job map, no generics) and validated at enqueue + dequeue.
+// Build schemas with `t` from this package so they share one TypeBox instance.
+const jobs = defineJobs({
+	'email.recap': t.Object({ accountId: t.String() }),
+	'match.ping': t.Object({ matchId: t.String() })
+});
 
-const store = createInMemoryJobStore<Jobs>();
-const registry = createJobRegistry<Jobs>()
+const store = createInMemoryJobStore(jobs);
+const registry = createJobRegistry(jobs)
 	.on('email.recap', async ({ accountId }) => {
-		// send the recap…
+		// accountId: string — inferred from the schema
 	})
 	.on('match.ping', async ({ matchId }, { attempts }) => {
 		// nudge the match…
@@ -74,6 +79,9 @@ app.use(
 
 ## How it works
 
+- **Schema-defined jobs** — `defineJobs` is the single source of truth: payload
+  types are inferred from TypeBox schemas (no hand-written job map, no `<Jobs>`
+  generics), and payloads are validated at enqueue and dequeue.
 - **Typed registry** — `kind → payload → handler`, checked end to end.
 - **`JobStore` interface** — `enqueue`, `claimDue` (atomic), `complete`, `fail`,
   `reapStuck`, `listByKind`. Swap `createInMemoryJobStore` for a durable adapter in prod.

@@ -1,12 +1,16 @@
+import { Type as t } from '@sinclair/typebox';
 import { describe, expect, it } from 'bun:test';
 import { Elysia } from 'elysia';
+import { defineJobs } from '../src/defineJobs';
 import { createInMemoryJobStore } from '../src/inMemoryJobStore';
 import { createQueueRoutes } from '../src/routes';
 
-type Jobs = { 'math.add': { left: number; right: number } };
+const jobs = defineJobs({
+	'math.add': t.Object({ left: t.Number(), right: t.Number() })
+});
 
 const makeApp = () => {
-	const store = createInMemoryJobStore<Jobs>();
+	const store = createInMemoryJobStore(jobs);
 
 	return { app: new Elysia().use(createQueueRoutes({ store })), store };
 };
@@ -24,8 +28,8 @@ describe('createQueueRoutes', () => {
 			payload: { left: 1, right: 2 }
 		});
 
-		const jobs = await json(app, '/queue/jobs');
-		expect(jobs).toHaveLength(1);
+		const list = await json(app, '/queue/jobs');
+		expect(list).toHaveLength(1);
 
 		const stats = await json(app, '/queue/stats');
 		expect(stats.pending).toBe(1);

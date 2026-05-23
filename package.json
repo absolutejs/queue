@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/queue",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "A durable, typed job queue for Elysia and the AbsoluteJS ecosystem",
 	"repository": {
 		"type": "git",
@@ -30,6 +30,9 @@
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write \"./**/*.{ts,json,md}\"",
 		"release": "bun run format && bun run build && bun publish"
+	},
+	"dependencies": {
+		"@sinclair/typebox": "^0.34.0"
 	},
 	"peerDependencies": {
 		"elysia": ">= 1.4.26"

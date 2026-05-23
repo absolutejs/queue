@@ -1,8 +1,19 @@
+import type { Static, TSchema } from '@sinclair/typebox';
+
 export type JobId = `${string}-${string}-${string}-${string}-${string}`;
 
 export type JobStatus = 'canceled' | 'claimed' | 'dead' | 'done' | 'pending';
 
 export type JobMap = Record<string, unknown>;
+
+// A job definition maps each kind to a TypeBox schema for its payload. It is the
+// single source of truth: payload types are inferred from it (JobMapFromDefinition)
+// and payloads are validated against it at enqueue and dequeue.
+export type JobDefinition = Record<string, TSchema>;
+
+export type JobMapFromDefinition<Def extends JobDefinition> = {
+	[Kind in keyof Def]: Static<Def[Kind]>;
+};
 
 export type Job<Jobs extends JobMap, Kind extends keyof Jobs = keyof Jobs> = {
 	attempts: number;
@@ -95,6 +106,7 @@ export type JobRegistry<Jobs extends JobMap> = {
 	getHandler: <Kind extends keyof Jobs>(
 		kind: Kind
 	) => JobHandler<Jobs, Kind> | undefined;
+	getSchema: (kind: keyof Jobs) => TSchema | undefined;
 	kinds: () => (keyof Jobs)[];
 	on: <Kind extends keyof Jobs>(
 		kind: Kind,
