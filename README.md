@@ -6,10 +6,11 @@ backoff, dead-letters, and runs delayed one-shots.
 
 It does **not** reinvent cron — pair it with
 [`@elysiajs/cron`](https://elysiajs.com/plugins/cron) for recurring triggers. Cron
-decides *when*; the queue guarantees the work *happens* (once, surviving restarts).
+decides _when_; the queue guarantees the work _happens_ (once, surviving restarts).
 
-> Status: early (`0.0.2`). In-memory store, schema-defined typed registry, worker,
-> Elysia plugin, admin routes, and a standalone worker runner. Production store:
+> Status: early (`0.0.4`). In-memory store, schema-defined typed registry, worker,
+> Elysia plugin, admin routes, standalone worker runner, and a `runHandlerOnce`
+> helper for manual triggers / tests. Production store:
 > [`@absolutejs/queue-postgres`](https://github.com/absolutejs/queue-adapters).
 
 ## Install
@@ -68,21 +69,83 @@ const app = new Elysia()
 
 ### Recurring jobs (with `@elysiajs/cron`)
 
-```ts
-import { cron } from '@elysiajs/cron';
+Pattern: keep the `store` at module scope so both the queue plugin's worker
+and the cron triggers reference the same backing state. The cron `run`
+callback doesn't receive an Elysia `Context`, so it can't reach the queue
+via decorators — it closes over the imported `store` directly.
 
-app.use(
-	cron({
-		name: 'weekly-digest',
-		pattern: '0 8 * * 1', // Mondays at 08:00
-		run: () =>
-			store.enqueue({
-				kind: 'email.send',
-				payload: { subject: 'Weekly digest', to: 'team@example.com' }
-			})
-	})
+```ts
+// src/jobs/index.ts
+import {
+	createInMemoryJobStore,
+	createJobRegistry,
+	defineJobs,
+	queue,
+	t
+} from '@absolutejs/queue';
+import { cron } from '@elysiajs/cron';
+import { Elysia } from 'elysia';
+
+const jobs = defineJobs({
+	'email.send': t.Object({ to: t.String(), subject: t.String() })
+});
+
+// Module-scoped so cron + worker reference the same backing state.
+export const store = createInMemoryJobStore(jobs);
+export const registry = createJobRegistry(jobs).on(
+	'email.send',
+	async () => {}
 );
+
+export const backgroundJobs = new Elysia({ name: 'background-jobs' })
+	.use(queue({ registry, store }))
+	.use(
+		cron({
+			name: 'weekly-digest',
+			pattern: '0 8 * * 1', // Mondays at 08:00
+			run: () =>
+				store.enqueue({
+					idempotencyKey: `weekly-digest:${new Date().toISOString().slice(0, 10)}`,
+					kind: 'email.send',
+					payload: {
+						subject: 'Weekly digest',
+						to: 'team@example.com'
+					}
+				})
+		})
+	);
 ```
+
+Tag enqueues with a per-day `idempotencyKey` so a misfire doesn't double-run.
+
+### One-shot manual triggers (`runHandlerOnce`)
+
+Sometimes you want to invoke a handler directly — manual backfills, admin
+re-runs, unit tests, or `bun scripts/foo.ts` wrappers that share logic with
+the cron. Use `runHandlerOnce`: it validates the payload through the
+registry's schema and synthesises a `JobContext` for you, then runs the
+handler — no worker, no store writes.
+
+```ts
+// scripts/runWeeklyDigest.ts
+import { runHandlerOnce } from '@absolutejs/queue';
+import { registry } from '../src/jobs/registry'; // direct import — see warning below
+
+await runHandlerOnce(registry, 'email.send', {
+	to: 'team@example.com',
+	subject: 'Weekly digest (manual trigger)'
+});
+```
+
+> **Don't import the barrel that re-exports `backgroundJobs`.** Importing the
+> Elysia plugin pulls in `@elysiajs/cron`, which keeps timers alive and
+> prevents your script from exiting. Either (a) split your jobs module so the
+> `registry` is exported from a different file than `backgroundJobs`, or
+> (b) `process.exit(0)` at the end of your script.
+
+`runHandlerOnce` accepts an `options.context` override (for `attempts`,
+`maxAttempts`, `id`, etc.) and an `options.validators` override (`false` to
+skip validation, or a pre-compiled `JobValidators` for hot loops).
 
 ## How it works
 

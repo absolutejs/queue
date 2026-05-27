@@ -5,11 +5,11 @@ AbsoluteJS + Elysia + Bun way. Persists jobs, claims them safely across instance
 retries with backoff, dead-letters, and runs delayed one-shots. A **core package**
 plus **storage adapters**.
 
-> **Why `queue`, not `scheduler`:** `@elysiajs/cron` already owns the *time trigger*
-> ("run every Monday 8am"). We don't rebuild that. The missing piece is the *durable
-> work*: a job that survives a restart, runs exactly once across N workers, retries,
+> **Why `queue`, not `scheduler`:** `@elysiajs/cron` already owns the _time trigger_
+> ("run every Monday 8am"). We don't rebuild that. The missing piece is the _durable
+> work_: a job that survives a restart, runs exactly once across N workers, retries,
 > and dead-letters. That's a queue. **They compose:** a cron tick calls
-> `queue.enqueue(...)`; cron decides *when*, the queue guarantees the work *happens*.
+> `queue.enqueue(...)`; cron decides _when_, the queue guarantees the work _happens_.
 
 > Fills gap **G1** in `~/onspark/absolutejs/dealroom/MIGRATION_PLAN.md`; onSpark adopts
 > it via task `S0`.
@@ -21,6 +21,7 @@ Status: **building** — core in `src/` (in-memory store, registry, worker, plug
 ## 1. The grain to respect (ecosystem conventions)
 
 Mirrors `@absolutejs/auth`:
+
 - **Flat `src/`, one responsibility per file, named exports only** (no defaults).
 - **Tabs (width 4), single quotes, semicolons, no trailing commas, 80 cols.**
 - **`type` aliases (not `interface`); strict TS + `noUncheckedIndexedAccess`.**
@@ -37,7 +38,7 @@ Mirrors `@absolutejs/auth`:
 ## 2. Core concepts
 
 - **Job** — `{ id, kind, payload, status, runAt, attempts, maxAttempts,
-  idempotencyKey?, lockedAt?, lockedBy?, lastError?, createdAt, updatedAt }`.
+idempotencyKey?, lockedAt?, lockedBy?, lastError?, createdAt, updatedAt }`.
   Status: `pending → claimed → done | dead`, with `claimed → pending` on retry.
 - **JobMap** — `kind → payload type`. Flows through `enqueue`, registry, handlers.
 - **JobStore** — persistence + atomic claim (the seam). `enqueue`, `claimDue`,
@@ -51,6 +52,7 @@ Mirrors `@absolutejs/auth`:
 ## 3. Package layout
 
 Built (this commit):
+
 - `src/types.ts` — `Job`, `JobMap`, `JobId`, `JobStore`, `JobRegistry`, handler/worker
   types.
 - `src/constants.ts` — defaults (max attempts, concurrency, poll interval, lease,
@@ -65,10 +67,11 @@ Built (this commit):
 - `tests/queue.test.ts` — run / dedupe / retry→dead-letter (`bun test`).
 
 Next:
+
 - `src/routes.ts` — admin/observability routes (list / retry / cancel / dead-letter).
 - `src/standaloneWorker.ts` — runner for `bun run worker.ts`.
 - `@absolutejs/queue-postgres` — `createPostgresJobStore()` (Drizzle, `FOR UPDATE SKIP
-  LOCKED`). Primary production store; matches onSpark.
+LOCKED`). Primary production store; matches onSpark.
 - `@absolutejs/queue-sqlite` — single-instance / edge.
 
 ---
@@ -83,15 +86,25 @@ type Jobs = {
 
 const store = createInMemoryJobStore<Jobs>();
 const registry = createJobRegistry<Jobs>()
-	.on('email.recap', async ({ accountId }, ctx) => { /* … */ })
-	.on('match.ping', async ({ matchId }) => { /* … */ });
+	.on('email.recap', async ({ accountId }, ctx) => {
+		/* … */
+	})
+	.on('match.ping', async ({ matchId }) => {
+		/* … */
+	});
 
-app.use(queue({ registry, store }));            // in-process worker auto-starts
+app.use(queue({ registry, store })); // in-process worker auto-starts
 // handler: ctx.queue.enqueue('email.recap', { accountId }, { runAt });
 
 // recurring (compose with @elysiajs/cron):
-app.use(cron({ name: 'weekly-recap', pattern: '0 8 * * 1',
-	run: () => store.enqueue({ kind: 'email.recap', payload: { accountId } }) }));
+app.use(
+	cron({
+		name: 'weekly-recap',
+		pattern: '0 8 * * 1',
+		run: () =>
+			store.enqueue({ kind: 'email.recap', payload: { accountId } })
+	})
+);
 ```
 
 ---

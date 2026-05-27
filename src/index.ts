@@ -23,6 +23,8 @@ export type {
 export { createJobRegistry } from './registry';
 export { createQueueRoutes } from './routes';
 export type { QueueRoutesOptions } from './routes';
+export { runHandlerOnce } from './runHandlerOnce';
+export type { RunHandlerOnceOptions } from './runHandlerOnce';
 export { runQueueWorker } from './standaloneWorker';
 export type { RunQueueWorkerOptions } from './standaloneWorker';
 export type {
