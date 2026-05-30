@@ -5,6 +5,32 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This package is pre-1.0 — minor bumps may carry breaking changes; we'll call
 them out here.
 
+## [0.2.0] — 2026-05-30
+
+### Added — OpenTelemetry tracing via @absolutejs/telemetry
+
+Closes G2 from the deep-research audit for the queue worker. Customer
+SREs investigating a flagged audit row (or a stuck tenant) now follow
+one trace from the enqueuing HTTP request → the job's worker.runJob
+span → any sync mutations / secret resolves the handler performs.
+
+- **`CreateQueueWorkerOptions.tracerProvider?: TracerProvider`** — any
+  `@opentelemetry/api`-compatible `TracerProvider`. When supplied,
+  every `runJob` is wrapped in a `queue.runJob` span with `ABS_ATTRS`
+  semantic attributes (`abs.job.id`, `abs.job.kind`,
+  `abs.job.attempt`, `abs.job.max_attempts`, `abs.worker.id`). When
+  omitted, all tracing is a zero-allocation noop.
+- Span status `OK` on successful completion; `ERROR` with the
+  exception recorded on handler throw (whether the failure dead-letters
+  or retries — that distinction is in metrics, not the span).
+- `@absolutejs/telemetry` added as a regular dep (250 LOC, zero
+  transitive deps).
+
+3 new tests in `tests/tracing.test.ts`: captures spans through a mock
+`TracerProvider`, verifies success path / failure path / noop fallback.
+
+Test count: 24 → 27.
+
 ## [0.1.0] — 2026-05-29
 
 ### Added — operator-shaped metrics, drain, in-memory snapshot/restore

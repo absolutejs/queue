@@ -1,4 +1,5 @@
 import { TypeCompiler } from '@sinclair/typebox/compiler';
+import { ABS_ATTRS, tracerOrNoop } from '@absolutejs/telemetry';
 import { exponentialBackoff } from './backoff';
 import {
 	DEFAULT_CONCURRENCY,
@@ -26,8 +27,11 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 	registry,
 	store,
+	tracerProvider,
 	workerId = crypto.randomUUID()
 }: CreateQueueWorkerOptions<Jobs>): QueueWorker => {
+	// 0.2.0: OTel tracer (noop when tracerProvider unset).
+	const tracer = tracerOrNoop(tracerProvider, '@absolutejs/queue');
 	let running = false;
 	let active = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -53,7 +57,20 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	}
 
 	const runJob = async (job: Job<Jobs>) => {
+		// 0.2.0: per-job span. The span lifetime IS the job's handler
+		// invocation — fail / retry / dead-letter all reflected in
+		// status + recorded exception.
+		const span = tracer.startSpan('queue.runJob', {
+			attributes: {
+				[ABS_ATTRS.jobAttempt]: job.attempts,
+				[ABS_ATTRS.jobId]: job.id,
+				[ABS_ATTRS.jobKind]: String(job.kind),
+				[ABS_ATTRS.jobMaxAttempts]: job.maxAttempts,
+				[ABS_ATTRS.workerId]: workerId
+			}
+		});
 		runs += 1;
+		try {
 		const handler = registry.getHandler(job.kind);
 		if (!handler) {
 			await store.fail(job.id, {
@@ -96,6 +113,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 			});
 			await store.complete(job.id);
 			completed += 1;
+			span.setStatus({ code: 1 /* OK */ });
 		} catch (error) {
 			const attempt = job.attempts + 1;
 			const message =
@@ -114,7 +132,23 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				retried += 1;
 			}
 
+			// 0.2.0: span captures the handler's exception. Status
+			// code is ERROR for both retryable + dead-lettered outcomes
+			// — the trace records that THIS attempt failed; downstream
+			// retries get their own span on the next run.
+			span.recordException(error);
+			span.setStatus({
+				code: 2 /* ERROR */,
+				message
+			});
+
 			onError?.(error, job);
+		}
+		} finally {
+			// 0.2.0: end the span on every exit path — handler-not-
+			// found early return, validation-failed early return,
+			// successful completion, and caught handler exceptions.
+			span.end();
 		}
 	};
 

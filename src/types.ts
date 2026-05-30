@@ -1,4 +1,5 @@
 import type { Static, TSchema } from '@sinclair/typebox';
+import type { TracerProvider } from '@absolutejs/telemetry';
 
 export type JobId = `${string}-${string}-${string}-${string}-${string}`;
 
@@ -125,6 +126,18 @@ export type CreateQueueWorkerOptions<Jobs extends JobMap> = {
 	registry: JobRegistry<Jobs>;
 	store: JobStore<Jobs>;
 	workerId?: string;
+	/**
+	 * Optional OpenTelemetry tracer provider. When set, every job run
+	 * is wrapped in a `queue.runJob` span with `abs.job.kind`,
+	 * `abs.job.id`, `abs.job.attempt`, `abs.job.max_attempts`,
+	 * `abs.worker.id` attributes. When absent, all tracing is a
+	 * zero-allocation noop. Added in 0.2.0.
+	 *
+	 * Pass any `@opentelemetry/api`-compatible `TracerProvider`. See
+	 * `@absolutejs/telemetry` for the type shape — queue re-uses its
+	 * helpers but doesn't peer-dep `@opentelemetry/api` directly.
+	 */
+	tracerProvider?: TracerProvider;
 };
 
 export type QueueWorker = {
