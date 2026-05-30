@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/queue",
-	"version": "0.0.4",
+	"version": "0.1.0",
 	"description": "A durable, typed job queue for Elysia and the AbsoluteJS ecosystem",
 	"repository": {
 		"type": "git",

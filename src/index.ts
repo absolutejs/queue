@@ -33,6 +33,8 @@ export type {
 	CreateQueueWorkerOptions,
 	EnqueueInput,
 	FailOptions,
+	InMemoryJobStore,
+	InMemoryJobStoreSnapshot,
 	Job,
 	JobContext,
 	JobDefinition,
@@ -46,6 +48,7 @@ export type {
 	ListByKindOptions,
 	ListJobsOptions,
 	QueueWorker,
+	QueueWorkerMetrics,
 	ReapStuckOptions
 } from './types';
 export {

@@ -9,7 +9,8 @@ import type {
 	CreateQueueWorkerOptions,
 	Job,
 	JobMap,
-	QueueWorker
+	QueueWorker,
+	QueueWorkerMetrics
 } from './types';
 import {
 	collectPayloadIssues,
@@ -30,6 +31,17 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	let running = false;
 	let active = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
+	// 0.1.0: operator-shaped metrics + drain state. All counters are
+	// cumulative since createQueueWorker().
+	let draining = false;
+	let runs = 0;
+	let completed = 0;
+	let failed = 0;
+	let retried = 0;
+	let deadLettered = 0;
+	let polls = 0;
+	let reaped = 0;
+	let lastTickMs = 0;
 
 	// Compile a validator per kind so a job whose persisted payload no longer
 	// matches the schema (stale data, schema drift) is dead-lettered instead of
@@ -41,12 +53,15 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	}
 
 	const runJob = async (job: Job<Jobs>) => {
+		runs += 1;
 		const handler = registry.getHandler(job.kind);
 		if (!handler) {
 			await store.fail(job.id, {
 				dead: true,
 				error: `No handler registered for kind "${String(job.kind)}"`
 			});
+			failed += 1;
+			deadLettered += 1;
 
 			return;
 		}
@@ -60,6 +75,8 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				dead: true,
 				error: `Payload validation failed: ${issues.join('; ')}`
 			});
+			failed += 1;
+			deadLettered += 1;
 			onError?.(
 				new QueuePayloadValidationError(String(job.kind), issues),
 				job
@@ -78,33 +95,46 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				signal: controller.signal
 			});
 			await store.complete(job.id);
+			completed += 1;
 		} catch (error) {
 			const attempt = job.attempts + 1;
 			const message =
 				error instanceof Error ? error.message : String(error);
 
-			if (attempt >= job.maxAttempts)
+			const isDead = attempt >= job.maxAttempts;
+			if (isDead) {
 				await store.fail(job.id, { dead: true, error: message });
-			else
+				failed += 1;
+				deadLettered += 1;
+			} else {
 				await store.fail(job.id, {
 					error: message,
 					retryAt: Date.now() + backoff(attempt)
 				});
+				retried += 1;
+			}
 
 			onError?.(error, job);
 		}
 	};
 
 	const tick = async () => {
-		const now = Date.now();
-		await store.reapStuck({ leaseMs, now });
+		const tickStart = Date.now();
+		polls += 1;
+		reaped += await store.reapStuck({ leaseMs, now: tickStart });
 
-		const capacity = concurrency - active;
-		if (capacity <= 0) return 0;
+		// 0.1.0: while draining, skip claiming new jobs. In-flight handlers
+		// keep running; stuck-lease reaps continue. The polling loop only
+		// halts on stop().
+		const capacity = draining ? 0 : concurrency - active;
+		if (capacity <= 0) {
+			lastTickMs = Date.now() - tickStart;
+			return 0;
+		}
 
 		const claimed = await store.claimDue({
 			limit: capacity,
-			now,
+			now: tickStart,
 			workerId
 		});
 
@@ -119,6 +149,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 			})
 		);
 
+		lastTickMs = Date.now() - tickStart;
 		return claimed.length;
 	};
 
@@ -134,7 +165,25 @@ export const createQueueWorker = <Jobs extends JobMap>({
 		}
 	};
 
+	const metrics = (): QueueWorkerMetrics => ({
+		active,
+		capacity: concurrency,
+		completed,
+		deadLettered,
+		draining,
+		failed,
+		lastTickMs,
+		polls,
+		reaped,
+		retried,
+		runs
+	});
+
 	return {
+		drain: () => {
+			draining = true;
+		},
+		metrics,
 		runOnce: tick,
 		start: () => {
 			if (running) return;

@@ -1,18 +1,18 @@
 import { DEFAULT_MAX_ATTEMPTS } from './constants';
 import { createJobId } from './ids';
 import type {
+	InMemoryJobStore,
 	Job,
 	JobDefinition,
 	JobId,
 	JobMapFromDefinition,
-	JobStatus,
-	JobStore
+	JobStatus
 } from './types';
 import { assertValidPayload, compileJobValidators } from './validation';
 
 export const createInMemoryJobStore = <const Def extends JobDefinition>(
 	definition: Def
-): JobStore<JobMapFromDefinition<Def>> => {
+): InMemoryJobStore<JobMapFromDefinition<Def>> => {
 	type Jobs = JobMapFromDefinition<Def>;
 	const cloneJob = (job: Job<Jobs>): Job<Jobs> => ({ ...job });
 	const validators = compileJobValidators(definition);
@@ -199,6 +199,22 @@ export const createInMemoryJobStore = <const Def extends JobDefinition>(
 			});
 
 			return true;
+		},
+		// 0.1.0: shard-rotation persistence. The host serializes this on a
+		// timer or on SIGTERM, persists wherever (disk, S3, another instance
+		// over the cluster bus), and hands it back to the replacement
+		// worker. `restore` overwrites the current map; refuse mid-flight
+		// restore to keep semantics clear.
+		snapshot: () => ({
+			exportedAt: Date.now(),
+			jobs: [...jobs.values()].map(cloneJob)
+		}),
+		restore: (snapshot) => {
+			jobs.clear();
+			for (const job of snapshot.jobs) {
+				jobs.set(job.id, cloneJob(job));
+			}
+			return snapshot.jobs.length;
 		}
 	};
 };

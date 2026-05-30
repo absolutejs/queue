@@ -131,4 +131,83 @@ export type QueueWorker = {
 	runOnce: () => Promise<number>;
 	start: () => void;
 	stop: () => Promise<void>;
+	/**
+	 * Operator-shaped snapshot of the worker's current state plus cumulative
+	 * counters since `createQueueWorker()`. Scrape on a 30s interval and feed
+	 * to `@absolutejs/metering` for per-worker cost/throughput attribution.
+	 *
+	 * - `active` / `capacity` — running handlers / configured concurrency.
+	 * - `draining` — `true` after `drain()` was called and before `stop()`.
+	 * - `runs` — handlers invoked (whether they completed, failed, or were
+	 *   dead-lettered). Equal to `completed + failed` once every claim has
+	 *   resolved.
+	 * - `completed` / `failed` — terminal outcomes since start. `failed`
+	 *   includes the dead-lettered tail; `deadLettered` is the subset that
+	 *   exhausted `maxAttempts`.
+	 * - `retried` — `fail()` calls that scheduled a retry (i.e. not
+	 *   dead-lettered). A single job may retry several times.
+	 * - `polls` — `tick()` invocations (whether claims were available or
+	 *   not). `reaped` — stuck-lease reaps fired during polling.
+	 * - `lastTickMs` — wall-clock duration of the most recent `tick()`. A
+	 *   sudden climb here is the operator's signal that the store is
+	 *   slowing down (PG locking, network jitter).
+	 *
+	 * Added in 0.1.0.
+	 */
+	metrics: () => QueueWorkerMetrics;
+	/**
+	 * Refuse to claim new jobs (claimDue is skipped); let in-flight handlers
+	 * finish their current work. The polling loop continues so stuck-lease
+	 * reaps keep running — `drain()` is "stop accepting new work" rather
+	 * than "halt the worker." Call `stop()` afterwards to actually shut
+	 * down. Symmetric with `@absolutejs/runtime`'s `drain()` and
+	 * `@absolutejs/isolated-jsc`'s pool `drain()`. Added in 0.1.0.
+	 */
+	drain: () => void;
+};
+
+/**
+ * Operator-shaped point-in-time snapshot returned by
+ * {@link QueueWorker.metrics}. Cumulative counters reset on
+ * `createQueueWorker()`. Added in 0.1.0.
+ */
+export type QueueWorkerMetrics = {
+	active: number;
+	capacity: number;
+	draining: boolean;
+	runs: number;
+	completed: number;
+	failed: number;
+	retried: number;
+	deadLettered: number;
+	polls: number;
+	reaped: number;
+	lastTickMs: number;
+};
+
+/**
+ * Serializable snapshot of an in-memory store's full state, produced by
+ * {@link InMemoryJobStore.snapshot} and consumed by
+ * {@link InMemoryJobStore.restore}. The host persists this on shard
+ * rotation (cron, SIGTERM) and hands it back to the replacement worker so
+ * pending + claimed jobs survive the restart.
+ *
+ * Stores backed by an external durable system (Postgres, Redis) don't
+ * need this — the durable layer IS the snapshot. Added in 0.1.0.
+ */
+export type InMemoryJobStoreSnapshot<Jobs extends JobMap> = {
+	jobs: ReadonlyArray<Job<Jobs>>;
+	exportedAt?: number;
+};
+
+/**
+ * Extends {@link JobStore} with snapshot/restore. The in-memory store
+ * returned by `createInMemoryJobStore` implements this surface; external
+ * stores typically don't (their durable layer handles persistence).
+ *
+ * Added in 0.1.0.
+ */
+export type InMemoryJobStore<Jobs extends JobMap> = JobStore<Jobs> & {
+	snapshot: () => InMemoryJobStoreSnapshot<Jobs>;
+	restore: (snapshot: InMemoryJobStoreSnapshot<Jobs>) => number;
 };
