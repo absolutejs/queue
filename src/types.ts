@@ -120,6 +120,20 @@ export type BackoffStrategy = (attempt: number) => number;
 export type CreateQueueWorkerOptions<Jobs extends JobMap> = {
 	backoff?: BackoffStrategy;
 	concurrency?: number;
+	/**
+	 * Max wall-clock a handler may run before the worker aborts its `signal`
+	 * and fails the job (retry / dead-letter via the normal path) — so a hung
+	 * handler frees its worker slot instead of holding it for the full lease.
+	 *
+	 * A number applies to every kind; a function lets each kind set its own
+	 * (e.g. 15s for emails, 5min for AI synthesis) — return `undefined` for no
+	 * limit on that kind. Unset = no timeout (back-compat). The handler should
+	 * still honor `signal` so its in-flight work actually stops; the timeout
+	 * only bounds how long the WORKER waits.
+	 */
+	handlerTimeoutMs?:
+		| number
+		| ((kind: keyof Jobs & string) => number | undefined);
 	leaseMs?: number;
 	onError?: (error: unknown, job?: Job<Jobs>) => void;
 	pollIntervalMs?: number;

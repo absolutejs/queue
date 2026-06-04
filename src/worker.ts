@@ -15,6 +15,7 @@ import type {
 } from './types';
 import {
 	collectPayloadIssues,
+	QueueHandlerTimeoutError,
 	QueuePayloadValidationError,
 	type JobValidators
 } from './validation';
@@ -22,6 +23,7 @@ import {
 export const createQueueWorker = <Jobs extends JobMap>({
 	backoff = exponentialBackoff(),
 	concurrency = DEFAULT_CONCURRENCY,
+	handlerTimeoutMs,
 	leaseMs = DEFAULT_LEASE_MS,
 	onError,
 	pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
@@ -32,6 +34,10 @@ export const createQueueWorker = <Jobs extends JobMap>({
 }: CreateQueueWorkerOptions<Jobs>): QueueWorker => {
 	// 0.2.0: OTel tracer (noop when tracerProvider unset).
 	const tracer = tracerOrNoop(tracerProvider, '@absolutejs/queue');
+	const resolveTimeoutMs = (kind: keyof Jobs & string) =>
+		typeof handlerTimeoutMs === 'function'
+			? handlerTimeoutMs(kind)
+			: handlerTimeoutMs;
 	let running = false;
 	let active = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
@@ -103,14 +109,38 @@ export const createQueueWorker = <Jobs extends JobMap>({
 		}
 
 		const controller = new AbortController();
+		const timeoutMs = resolveTimeoutMs(job.kind as keyof Jobs & string);
+		let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 		try {
-			await handler(job.payload, {
+			const run = handler(job.payload, {
 				attempts: job.attempts,
 				id: job.id,
 				kind: job.kind,
 				maxAttempts: job.maxAttempts,
 				signal: controller.signal
 			});
+			// Bound the WORKER's wait: on timeout, abort the handler's signal
+			// (so a cooperating handler stops its in-flight work) and reject so
+			// the job falls through to the normal retry / dead-letter path —
+			// freeing the worker slot instead of holding it for the full lease.
+			if (timeoutMs !== undefined && timeoutMs > 0) {
+				await Promise.race([
+					run,
+					new Promise<never>((_resolve, reject) => {
+						timeoutTimer = setTimeout(() => {
+							controller.abort();
+							reject(
+								new QueueHandlerTimeoutError(
+									String(job.kind),
+									timeoutMs
+								)
+							);
+						}, timeoutMs);
+					})
+				]);
+			} else {
+				await run;
+			}
 			await store.complete(job.id);
 			completed += 1;
 			span.setStatus({ code: 1 /* OK */ });
@@ -143,6 +173,8 @@ export const createQueueWorker = <Jobs extends JobMap>({
 			});
 
 			onError?.(error, job);
+		} finally {
+			if (timeoutTimer) clearTimeout(timeoutTimer);
 		}
 		} finally {
 			// 0.2.0: end the span on every exit path — handler-not-

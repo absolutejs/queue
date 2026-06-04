@@ -16,6 +16,24 @@ export class QueuePayloadValidationError extends Error {
 	}
 }
 
+/**
+ * Thrown when a handler exceeds its configured `handlerTimeoutMs`. The worker
+ * aborts the handler's `signal` and fails the job through the normal retry /
+ * dead-letter path, so a hung handler frees its worker slot instead of holding
+ * it for the full lease (the classic "stuck spinner" cause).
+ */
+export class QueueHandlerTimeoutError extends Error {
+	readonly kind: string;
+	readonly timeoutMs: number;
+
+	constructor(kind: string, timeoutMs: number) {
+		super(`Handler for job "${kind}" timed out after ${timeoutMs}ms`);
+		this.name = 'QueueHandlerTimeoutError';
+		this.kind = kind;
+		this.timeoutMs = timeoutMs;
+	}
+}
+
 // Compile one validator per kind up front (cheap to reuse, costly to redo).
 export const compileJobValidators = (
 	definition: JobDefinition

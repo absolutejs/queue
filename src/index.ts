@@ -55,6 +55,7 @@ export {
 	assertValidPayload,
 	collectPayloadIssues,
 	compileJobValidators,
+	QueueHandlerTimeoutError,
 	QueuePayloadValidationError
 } from './validation';
 export type { JobValidators } from './validation';
