@@ -162,4 +162,4 @@ skip validation, or a pre-compiled `JobValidators` for hot loops).
 
 ## License
 
-CC BY-NC 4.0
+BSL-1.1 — see [LICENSE](./LICENSE). Converts to Apache 2.0 on the Change Date per the license terms.
