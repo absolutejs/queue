@@ -77,105 +77,105 @@ export const createQueueWorker = <Jobs extends JobMap>({
 		});
 		runs += 1;
 		try {
-		const handler = registry.getHandler(job.kind);
-		if (!handler) {
-			await store.fail(job.id, {
-				dead: true,
-				error: `No handler registered for kind "${String(job.kind)}"`
-			});
-			failed += 1;
-			deadLettered += 1;
-
-			return;
-		}
-
-		const issues = collectPayloadIssues(
-			validators.get(String(job.kind)),
-			job.payload
-		);
-		if (issues) {
-			await store.fail(job.id, {
-				dead: true,
-				error: `Payload validation failed: ${issues.join('; ')}`
-			});
-			failed += 1;
-			deadLettered += 1;
-			onError?.(
-				new QueuePayloadValidationError(String(job.kind), issues),
-				job
-			);
-
-			return;
-		}
-
-		const controller = new AbortController();
-		const timeoutMs = resolveTimeoutMs(job.kind as keyof Jobs & string);
-		let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
-		try {
-			const run = handler(job.payload, {
-				attempts: job.attempts,
-				id: job.id,
-				kind: job.kind,
-				maxAttempts: job.maxAttempts,
-				signal: controller.signal
-			});
-			// Bound the WORKER's wait: on timeout, abort the handler's signal
-			// (so a cooperating handler stops its in-flight work) and reject so
-			// the job falls through to the normal retry / dead-letter path —
-			// freeing the worker slot instead of holding it for the full lease.
-			if (timeoutMs !== undefined && timeoutMs > 0) {
-				await Promise.race([
-					run,
-					new Promise<never>((_resolve, reject) => {
-						timeoutTimer = setTimeout(() => {
-							controller.abort();
-							reject(
-								new QueueHandlerTimeoutError(
-									String(job.kind),
-									timeoutMs
-								)
-							);
-						}, timeoutMs);
-					})
-				]);
-			} else {
-				await run;
-			}
-			await store.complete(job.id);
-			completed += 1;
-			span.setStatus({ code: 1 /* OK */ });
-		} catch (error) {
-			const attempt = job.attempts + 1;
-			const message =
-				error instanceof Error ? error.message : String(error);
-
-			const isDead = attempt >= job.maxAttempts;
-			if (isDead) {
-				await store.fail(job.id, { dead: true, error: message });
+			const handler = registry.getHandler(job.kind);
+			if (!handler) {
+				await store.fail(job.id, {
+					dead: true,
+					error: `No handler registered for kind "${String(job.kind)}"`
+				});
 				failed += 1;
 				deadLettered += 1;
-			} else {
-				await store.fail(job.id, {
-					error: message,
-					retryAt: Date.now() + backoff(attempt)
-				});
-				retried += 1;
+
+				return;
 			}
 
-			// 0.2.0: span captures the handler's exception. Status
-			// code is ERROR for both retryable + dead-lettered outcomes
-			// — the trace records that THIS attempt failed; downstream
-			// retries get their own span on the next run.
-			span.recordException(error);
-			span.setStatus({
-				code: 2 /* ERROR */,
-				message
-			});
+			const issues = collectPayloadIssues(
+				validators.get(String(job.kind)),
+				job.payload
+			);
+			if (issues) {
+				await store.fail(job.id, {
+					dead: true,
+					error: `Payload validation failed: ${issues.join('; ')}`
+				});
+				failed += 1;
+				deadLettered += 1;
+				onError?.(
+					new QueuePayloadValidationError(String(job.kind), issues),
+					job
+				);
 
-			onError?.(error, job);
-		} finally {
-			if (timeoutTimer) clearTimeout(timeoutTimer);
-		}
+				return;
+			}
+
+			const controller = new AbortController();
+			const timeoutMs = resolveTimeoutMs(job.kind as keyof Jobs & string);
+			let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
+			try {
+				const run = handler(job.payload, {
+					attempts: job.attempts,
+					id: job.id,
+					kind: job.kind,
+					maxAttempts: job.maxAttempts,
+					signal: controller.signal
+				});
+				// Bound the WORKER's wait: on timeout, abort the handler's signal
+				// (so a cooperating handler stops its in-flight work) and reject so
+				// the job falls through to the normal retry / dead-letter path —
+				// freeing the worker slot instead of holding it for the full lease.
+				if (timeoutMs !== undefined && timeoutMs > 0) {
+					await Promise.race([
+						run,
+						new Promise<never>((_resolve, reject) => {
+							timeoutTimer = setTimeout(() => {
+								controller.abort();
+								reject(
+									new QueueHandlerTimeoutError(
+										String(job.kind),
+										timeoutMs
+									)
+								);
+							}, timeoutMs);
+						})
+					]);
+				} else {
+					await run;
+				}
+				await store.complete(job.id);
+				completed += 1;
+				span.setStatus({ code: 1 /* OK */ });
+			} catch (error) {
+				const attempt = job.attempts + 1;
+				const message =
+					error instanceof Error ? error.message : String(error);
+
+				const isDead = attempt >= job.maxAttempts;
+				if (isDead) {
+					await store.fail(job.id, { dead: true, error: message });
+					failed += 1;
+					deadLettered += 1;
+				} else {
+					await store.fail(job.id, {
+						error: message,
+						retryAt: Date.now() + backoff(attempt)
+					});
+					retried += 1;
+				}
+
+				// 0.2.0: span captures the handler's exception. Status
+				// code is ERROR for both retryable + dead-lettered outcomes
+				// — the trace records that THIS attempt failed; downstream
+				// retries get their own span on the next run.
+				span.recordException(error);
+				span.setStatus({
+					code: 2 /* ERROR */,
+					message
+				});
+
+				onError?.(error, job);
+			} finally {
+				if (timeoutTimer) clearTimeout(timeoutTimer);
+			}
 		} finally {
 			// 0.2.0: end the span on every exit path — handler-not-
 			// found early return, validation-failed early return,

@@ -238,3 +238,141 @@ export type InMemoryJobStore<Jobs extends JobMap> = JobStore<Jobs> & {
 	snapshot: () => InMemoryJobStoreSnapshot<Jobs>;
 	restore: (snapshot: InMemoryJobStoreSnapshot<Jobs>) => number;
 };
+
+/**
+ * One per-tenant wake schedule for {@link WakeScheduler}. Exactly one of
+ * `every` (fixed interval) or `cron` (5-field UTC expression — see
+ * `parseCronExpression` for the supported grammar) must be set; `add()`
+ * throws otherwise. Added in 0.4.0.
+ */
+export type WakeEntry = {
+	/** 5-field UTC cron expression. Mutually exclusive with `every`. */
+	cron?: string;
+	/** Schedules default to enabled; `false` keeps the entry parked. */
+	enabled?: boolean;
+	/** Fixed interval in milliseconds. Mutually exclusive with `cron`. */
+	every?: number;
+	/** Unique schedule id — also the snapshot/restore key. */
+	id: string;
+	/**
+	 * Random extra delay in `[0, jitterMs)` added to each firing so a fleet
+	 * of same-cadence schedules doesn't wake every tenant on the same tick.
+	 * Randomness comes from the scheduler's injectable `random` option.
+	 */
+	jitterMs?: number;
+	/** Tenant identifier — becomes the `abs.tenant` span attribute. */
+	tenant: string;
+	/**
+	 * Optional wake target. The scheduler never fetches it itself — pass
+	 * `httpWake()` as the `wake` option (or read `entry.url` inside your own
+	 * wake fn) to POST it.
+	 */
+	url?: string;
+};
+
+/**
+ * What to do when a schedule comes back overdue after downtime (control-
+ * plane restart, restored snapshot, suspended host): `'skip'` drops the
+ * missed firings and resumes the cadence going forward; `'once'` fires a
+ * single compensating wake immediately. Missed firings are counted in
+ * `metrics().missedSkipped` under both modes. Added in 0.4.0.
+ */
+export type WakeCatchUpMode = 'once' | 'skip';
+
+export type CreateWakeSchedulerOptions = {
+	/** Downtime catch-up policy. Default `'skip'`. */
+	catchUp?: WakeCatchUpMode;
+	/** Initial schedules; equivalent to calling `add()` for each. */
+	entries?: WakeEntry[];
+	/** Injectable clock — tests advance it manually and call `tick()`. */
+	now?: () => number;
+	/**
+	 * Called when a wake throws/rejects (with the entry) or when a tick
+	 * itself fails (without one) — mirrors the worker's `onError`.
+	 */
+	onError?: (error: unknown, entry?: WakeEntry) => void;
+	/** Injectable randomness for `jitterMs`. Default `Math.random`. */
+	random?: () => number;
+	/** Polling cadence for `start()`. Default 15_000. */
+	tickMs?: number;
+	/**
+	 * Optional OpenTelemetry tracer provider. When set, every firing is
+	 * wrapped in a `queue.wake` span with `abs.tenant` + `abs.wake.id`
+	 * attributes, matching the worker's `queue.runJob` idiom. When absent,
+	 * all tracing is a zero-allocation noop.
+	 */
+	tracerProvider?: TracerProvider;
+	/**
+	 * The wake action — the single seam. An HTTP poke (`httpWake()`),
+	 * `runtime.ensure(entry.tenant)`, a cluster-bus message. A throw or
+	 * rejection counts as an error and never blocks other entries.
+	 */
+	wake: (entry: WakeEntry) => Promise<void> | void;
+};
+
+/**
+ * Operator-shaped point-in-time snapshot returned by
+ * {@link WakeScheduler.metrics}. Cumulative counters reset on
+ * `createWakeScheduler()`. Added in 0.4.0.
+ */
+export type WakeSchedulerMetrics = {
+	byTenant: Record<string, { errors: number; firings: number }>;
+	draining: boolean;
+	enabled: number;
+	entries: number;
+	errors: number;
+	firings: number;
+	lastTickMs: number;
+	missedSkipped: number;
+	skippedTicks: number;
+};
+
+/**
+ * Serializable snapshot of the scheduler's schedules plus per-entry
+ * `lastFiredAt`, produced by {@link WakeScheduler.snapshot} and consumed by
+ * {@link WakeScheduler.restore} — same idiom as `InMemoryJobStore`. The
+ * control plane persists this on rotation (cron, SIGTERM) and hands it back
+ * to the replacement process so a restart neither double-fires nor loses
+ * schedules. Added in 0.4.0.
+ */
+export type WakeSchedulerSnapshot = {
+	entries: ReadonlyArray<{ entry: WakeEntry; lastFiredAt?: number }>;
+	exportedAt?: number;
+};
+
+/**
+ * A control-plane-side durable scheduler that fires per-tenant schedules
+ * and wakes tenants. Returned by `createWakeScheduler`. Added in 0.4.0.
+ */
+export type WakeScheduler = {
+	/** Register a schedule. Throws on a duplicate id or an invalid entry. */
+	add: (entry: WakeEntry) => void;
+	/** Park a schedule without removing it. `false` when the id is unknown. */
+	disable: (id: string) => boolean;
+	/**
+	 * Stop firing new wakes; in-flight wake promises settle on their own.
+	 * Symmetric with `worker.drain()`. Call `stop()` afterwards to shut
+	 * down the polling loop.
+	 */
+	drain: () => void;
+	/**
+	 * Un-park a schedule. Re-anchors the cadence at the current time so a
+	 * long-disabled entry doesn't look like downtime backlog the moment it
+	 * comes back. `false` when the id is unknown.
+	 */
+	enable: (id: string) => boolean;
+	list: () => WakeEntry[];
+	metrics: () => WakeSchedulerMetrics;
+	remove: (id: string) => boolean;
+	/** Replace all schedules + firing state with the snapshot's. Returns the entry count. */
+	restore: (snapshot: WakeSchedulerSnapshot) => number;
+	snapshot: () => WakeSchedulerSnapshot;
+	start: () => void;
+	stop: () => Promise<void>;
+	/**
+	 * One evaluation pass — exposed for tests (advance the injected `now`,
+	 * then call `tick()`). Returns how many wakes fired. Overlapping ticks
+	 * are skipped (and counted in `skippedTicks`) rather than double-fired.
+	 */
+	tick: () => Promise<number>;
+};

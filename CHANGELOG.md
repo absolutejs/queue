@@ -5,6 +5,65 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This package is pre-1.0 — minor bumps may carry breaking changes; we'll call
 them out here.
 
+## [0.4.0] — 2026-07-13
+
+### Added — control-plane wake scheduler (`createWakeScheduler`)
+
+Closes PaaS-guide gap 5.5: background jobs that survive process death.
+A customer cron that triggers every 6h won't fire if their tenant
+process is idle-killed — so the CONTROL PLANE (never idle-killed) runs
+the schedule and pokes the tenant awake; the tenant's queue worker does
+the actual work once it's up. Fully backwards-compatible additive
+feature.
+
+- **`createWakeScheduler(options)`** — durable host-side scheduler.
+  Entries (`WakeEntry`) carry exactly one of `every` (interval ms) or
+  `cron` (5-field UTC expression), plus `tenant`, optional `url` /
+  `jitterMs` / `enabled`. The wake itself is the caller-supplied
+  `wake(entry)` seam — HTTP poke, `runtime.ensure(tenant)`, anything.
+- **API**: `start()` / `stop()`; `add` / `remove` / `enable` /
+  `disable` / `list`; `tick()` exposed for tests (manual advance with
+  the injectable `now`); `snapshot()` / `restore(snap)` persisting
+  entries + per-entry `lastFiredAt` (same idiom as
+  `InMemoryJobStore`) so a control-plane restart neither double-fires
+  nor loses schedules; `metrics()` (`entries`, `enabled`, `firings`,
+  `errors`, `missedSkipped`, `skippedTicks`, `lastTickMs`, `draining`,
+  `byTenant`); `drain()` symmetric with `worker.drain()`.
+- **Semantics**: wakes fire concurrently (`Promise.allSettled`) — a
+  throwing wake hits `onError` + the `errors` counter and never blocks
+  other entries; overlapping ticks are skipped and counted; a cron
+  entry fires at most once per matching minute; `catchUp: 'skip'`
+  (default) drops firings missed during downtime while `'once'` fires
+  a single compensating wake — both count `missedSkipped`; `jitterMs`
+  delays each firing by `random() * jitterMs` via the injectable
+  `random` option.
+- **`httpWake(fetchImpl?)`** — convenience wake action that POSTs to
+  `entry.url` and treats non-2xx as an error. `wake` stays the single
+  seam.
+- **In-repo 5-field cron parser** (`parseCronExpression`,
+  `cronMatchesMinute` — exported): `*`, numbers, comma lists, ranges,
+  `/n` steps on `*` or a range, day-of-week `0-7` (`7` ≡ Sunday),
+  standard either-day-field OR semantics, evaluated in UTC. No cron
+  dependency; no names / `L` / `W` / seconds / macros / time zones.
+- **OTel**: with a `tracerProvider`, every firing is a `queue.wake`
+  span with `abs.tenant` + `abs.wake.id`, matching the `queue.runJob`
+  idiom.
+- **Manifest**: new `wake-scheduler` wiring recipe alongside the
+  default queue recipe.
+- New constant `DEFAULT_WAKE_TICK_MS` (15_000); new types `WakeEntry`,
+  `WakeCatchUpMode`, `CreateWakeSchedulerOptions`, `WakeScheduler`,
+  `WakeSchedulerMetrics`, `WakeSchedulerSnapshot`, `CronExpression`.
+
+25 new tests in `tests/wakeScheduler.test.ts`: cron field types + UTC
+boundaries + OR day semantics + malformed expressions, interval firing
+with injected `now`, no double-fire within a minute, catch-up skip vs
+once (interval + cron), snapshot/restore across a "restart", error
+isolation + `onError`, enable/disable/remove, drain, overlap guard,
+metrics, jitter with injected `random`, `httpWake` success / non-2xx /
+missing url, and `queue.wake` span capture.
+
+Test count: 29 → 54.
+
 ## [0.2.0] — 2026-05-30
 
 ### Added — OpenTelemetry tracing via @absolutejs/telemetry
@@ -60,6 +119,7 @@ hooks it needs without external wrappers.
   layer IS the snapshot.
 
 10 new tests in `tests/metrics.test.ts`:
+
 - metrics starts zeroed,
 - completed runs counted,
 - retried distinct from deadLettered,

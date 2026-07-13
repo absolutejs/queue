@@ -79,10 +79,7 @@ describe('queue 0.2.0 — OTel tracing via @absolutejs/telemetry', () => {
 	it('emits queue.runJob span on a successful job', async () => {
 		const { provider, spans } = makeCapturingTracerProvider();
 		const store = createInMemoryJobStore(jobs);
-		const registry = createJobRegistry(jobs).on(
-			'math.add',
-			() => {}
-		);
+		const registry = createJobRegistry(jobs).on('math.add', () => {});
 		const worker = createQueueWorker({
 			registry,
 			store,
@@ -106,12 +103,9 @@ describe('queue 0.2.0 — OTel tracing via @absolutejs/telemetry', () => {
 	it('records exception + sets ERROR status on a failing job', async () => {
 		const { provider, spans } = makeCapturingTracerProvider();
 		const store = createInMemoryJobStore(jobs);
-		const registry = createJobRegistry(jobs).on(
-			'math.fail',
-			() => {
-				throw new Error('handler boom');
-			}
-		);
+		const registry = createJobRegistry(jobs).on('math.fail', () => {
+			throw new Error('handler boom');
+		});
 		const worker = createQueueWorker({
 			backoff: () => 0,
 			registry,
@@ -129,10 +123,7 @@ describe('queue 0.2.0 — OTel tracing via @absolutejs/telemetry', () => {
 
 	it('without tracerProvider the worker still runs (noop path)', async () => {
 		const store = createInMemoryJobStore(jobs);
-		const registry = createJobRegistry(jobs).on(
-			'math.add',
-			() => {}
-		);
+		const registry = createJobRegistry(jobs).on('math.add', () => {});
 		const worker = createQueueWorker({ registry, store });
 		await store.enqueue({
 			kind: 'math.add',

@@ -8,9 +8,10 @@ It does **not** reinvent cron — pair it with
 [`@elysiajs/cron`](https://elysiajs.com/plugins/cron) for recurring triggers. Cron
 decides _when_; the queue guarantees the work _happens_ (once, surviving restarts).
 
-> Status: early (`0.0.4`). In-memory store, schema-defined typed registry, worker,
-> Elysia plugin, admin routes, standalone worker runner, and a `runHandlerOnce`
-> helper for manual triggers / tests. Production store:
+> Status: early (`0.4.0`). In-memory store, schema-defined typed registry, worker,
+> Elysia plugin, admin routes, standalone worker runner, a `runHandlerOnce`
+> helper for manual triggers / tests, and a control-plane `createWakeScheduler`
+> for waking idle-killed tenants. Production store:
 > [`@absolutejs/queue-postgres`](https://github.com/absolutejs/queue-adapters).
 
 ## Install
@@ -117,6 +118,84 @@ export const backgroundJobs = new Elysia({ name: 'background-jobs' })
 ```
 
 Tag enqueues with a per-day `idempotencyKey` so a misfire doesn't double-run.
+
+### Waking idle-killed tenants (`createWakeScheduler`)
+
+On a PaaS, tenant processes get idle-killed — and with them dies every
+in-process timer. A customer cron that triggers every 6 hours won't fire if
+the tenant has been asleep for 5 of them. The fix is architectural: the
+**control plane** (which is never idle-killed) owns the schedule and pokes
+the tenant awake; the tenant's own queue worker then does the actual work.
+
+`createWakeScheduler` is that control-plane side: a durable scheduler that
+fires per-tenant schedules (`every` interval or 5-field UTC cron) and calls
+a caller-supplied `wake` action — an HTTP poke, `runtime.ensure(tenant)`,
+whatever brings the tenant up.
+
+```ts
+import { createWakeScheduler, httpWake } from '@absolutejs/queue';
+
+// Runs on the CONTROL PLANE (always-on), not in tenant processes.
+const wakeScheduler = createWakeScheduler({
+	entries: [
+		// Exactly one of `every` (ms) or `cron` (5-field, UTC) per entry.
+		{
+			every: 6 * 60 * 60 * 1000,
+			id: 'acme-digest',
+			tenant: 'acme',
+			url: 'https://acme.internal/wake'
+		},
+		{ cron: '0 8 * * 1', id: 'globex-report', tenant: 'globex' }
+	],
+	// The wake is the single seam. httpWake() POSTs entry.url and treats
+	// non-2xx as an error...
+	wake: httpWake(),
+	onError: (error, entry) => console.error(entry?.id, error)
+});
+wakeScheduler.start();
+```
+
+Pairing with [`@absolutejs/runtime`](https://github.com/absolutejs/runtime),
+the wake IS the process resurrection — `ensure` boots the tenant if it's
+down, and the tenant's queue worker picks up its due jobs on startup:
+
+```ts
+const wakeScheduler = createWakeScheduler({
+	entries: tenantSchedules,
+	wake: async (entry) => {
+		await runtime.ensure(entry.tenant);
+	}
+});
+```
+
+What the scheduler guarantees:
+
+- **Restart safety** — `snapshot()` / `restore(snap)` persist the entries
+  plus per-entry `lastFiredAt` (same idiom as the in-memory store's
+  snapshot/restore), so a control-plane restart neither double-fires nor
+  loses schedules. `catchUp: 'skip'` (default) drops firings missed during
+  downtime and resumes the cadence; `catchUp: 'once'` fires a single
+  compensating wake. Either way `metrics().missedSkipped` counts them.
+- **Error isolation** — wakes fire concurrently; one tenant's failing wake
+  hits `onError` + the `errors` counter and never blocks the rest. A failed
+  wake waits for its next slot (a wake is a poke, not a job — no backoff
+  ladder).
+- **No double-fire** — a cron entry fires at most once per matching minute;
+  overlapping ticks are skipped and counted, never run twice.
+- **Operator surface** — `add` / `remove` / `enable` / `disable` / `list`,
+  `metrics()` (`entries`, `enabled`, `firings`, `errors`, `missedSkipped`,
+  `skippedTicks`, `lastTickMs`, `byTenant`), and `drain()` symmetric with
+  `worker.drain()`. `tick()` is exposed for tests with an injected `now`;
+  `jitterMs` spreads same-cadence fleets via an injectable `random`.
+- **Tracing** — with a `tracerProvider`, every firing is a `queue.wake`
+  span carrying `abs.tenant` + `abs.wake.id`, matching `queue.runJob`.
+
+The in-repo cron parser is deliberately minimal: 5 fields
+(`minute hour day-of-month month day-of-week`), `*`, numbers, comma lists,
+ranges, `/n` steps on `*` or a range, day-of-week `0-7` (both `0` and `7`
+are Sunday), standard either-day-field-matches semantics, **UTC only**. No
+names (`MON`), no `L`/`W`/`#`, no seconds, no macros — if you need those,
+run a real cron and call `wake` yourself.
 
 ### One-shot manual triggers (`runHandlerOnce`)
 

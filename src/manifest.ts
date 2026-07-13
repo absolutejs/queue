@@ -207,6 +207,32 @@ export const manifest = defineManifest<
 				placement: 'module-scope'
 			},
 			title: 'Define jobs and start the queue'
+		},
+		{
+			description:
+				'Control-plane side: durable per-tenant schedules that poke idle-killed tenants awake, so a tenant cron still fires when its process is asleep. The wake action is yours — an HTTP poke (httpWake) or runtime.ensure(tenant).',
+			id: 'wake-scheduler',
+			server: {
+				code: [
+					'// Runs on the CONTROL PLANE (always-on), not in tenant processes.',
+					'const wakeScheduler = createWakeScheduler({',
+					'\tentries: [',
+					'\t\t// TODO: one entry per tenant schedule — `every` (ms) or a 5-field UTC cron.',
+					"\t\t{ every: 21_600_000, id: 'acme-cron', tenant: 'acme', url: 'https://acme.internal/wake' }",
+					'\t],',
+					'\twake: httpWake()',
+					'});',
+					'wakeScheduler.start();'
+				].join('\n'),
+				imports: [
+					{
+						from: '@absolutejs/queue',
+						names: ['createWakeScheduler', 'httpWake']
+					}
+				],
+				placement: 'module-scope'
+			},
+			title: 'Wake idle tenants on a schedule'
 		}
 	]
 });

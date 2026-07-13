@@ -9,8 +9,11 @@ export {
 	DEFAULT_CONCURRENCY,
 	DEFAULT_LEASE_MS,
 	DEFAULT_MAX_ATTEMPTS,
-	DEFAULT_POLL_INTERVAL_MS
+	DEFAULT_POLL_INTERVAL_MS,
+	DEFAULT_WAKE_TICK_MS
 } from './constants';
+export { cronMatchesMinute, parseCronExpression } from './cron';
+export type { CronExpression } from './cron';
 export { defineJobs } from './defineJobs';
 export { createJobId } from './ids';
 export { createInMemoryJobStore } from './inMemoryJobStore';
@@ -31,6 +34,7 @@ export type {
 	BackoffStrategy,
 	ClaimDueOptions,
 	CreateQueueWorkerOptions,
+	CreateWakeSchedulerOptions,
 	EnqueueInput,
 	FailOptions,
 	InMemoryJobStore,
@@ -49,7 +53,12 @@ export type {
 	ListJobsOptions,
 	QueueWorker,
 	QueueWorkerMetrics,
-	ReapStuckOptions
+	ReapStuckOptions,
+	WakeCatchUpMode,
+	WakeEntry,
+	WakeScheduler,
+	WakeSchedulerMetrics,
+	WakeSchedulerSnapshot
 } from './types';
 export {
 	assertValidPayload,
@@ -59,4 +68,5 @@ export {
 	QueuePayloadValidationError
 } from './validation';
 export type { JobValidators } from './validation';
+export { createWakeScheduler, httpWake } from './wakeScheduler';
 export { createQueueWorker } from './worker';
