@@ -5,6 +5,17 @@ loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This package is pre-1.0 — minor bumps may carry breaking changes; we'll call
 them out here.
 
+## [0.4.1] — 2026-07-14
+
+### Fixed — current telemetry provider compatibility
+
+- Aligns the regular `@absolutejs/telemetry` dependency with 0.1.1 so queue's
+  public `tracerProvider` options accept the current ecosystem provider type.
+- Removes the duplicate 0.0.x telemetry type identity that prevented hosts on
+  telemetry 0.1.x from tracing `queue.runJob` and `queue.wake` without a cast.
+- Existing worker and wake-scheduler span tests regression-pin successful and
+  failed spans against the updated telemetry contract.
+
 ## [0.4.0] — 2026-07-13
 
 ### Added — control-plane wake scheduler (`createWakeScheduler`)

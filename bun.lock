@@ -6,7 +6,7 @@
       "name": "@absolutejs/queue",
       "dependencies": {
         "@absolutejs/manifest": "^0.1.0",
-        "@absolutejs/telemetry": "^0.0.2",
+        "@absolutejs/telemetry": "^0.1.1",
         "@sinclair/typebox": "^0.34.0",
       },
       "devDependencies": {
@@ -38,7 +38,7 @@
 
     "@absolutejs/native-windows-x64": ["@absolutejs/native-windows-x64@0.19.0-beta.1008", "", { "os": "win32", "cpu": "x64" }, "sha512-mXIL6AzV0gznwXz6gF+dtT4DIwxKMriF+WYxcjAPlf4xWD0S3ZS8jafHwQXi0RJn0pIX4TIIOhRz0JnVlka3zA=="],
 
-    "@absolutejs/telemetry": ["@absolutejs/telemetry@0.0.2", "", {}, "sha512-MwbcKNZaY8ByzZ7HKergCmGkc219A5cQfn0lyljmWMYxdXecuXp2I5JkCu28K52vgbC0z1b03grVNHQgBeg5sQ=="],
+    "@absolutejs/telemetry": ["@absolutejs/telemetry@0.1.1", "", {}, "sha512-NcwsZytPOVQSnksYVofmvdDNqIwIJLbUmAMAZD5v2gLy98JgtvEmR1kHGNIXGAZgHA4rqofQt7PZlVCCwlx2mQ=="],
 
     "@borewit/text-codec": ["@borewit/text-codec@0.2.2", "", {}, "sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ=="],
 
