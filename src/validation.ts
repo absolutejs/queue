@@ -1,6 +1,12 @@
-import type { TSchema } from '@sinclair/typebox';
+import { FormatRegistry, type TSchema } from '@sinclair/typebox';
 import { TypeCompiler, type TypeCheck } from '@sinclair/typebox/compiler';
 import type { JobDefinition } from './types';
+
+const UUID_FORMAT =
+	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+if (!FormatRegistry.Has('uuid'))
+	FormatRegistry.Set('uuid', (value) => UUID_FORMAT.test(value));
 
 export type JobValidators = Map<string, TypeCheck<TSchema>>;
 
