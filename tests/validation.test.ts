@@ -4,7 +4,7 @@ import {
 	assertValidPayload,
 	compileJobValidators,
 	QueuePayloadValidationError
-} from './validation';
+} from '../src/validation';
 
 describe('queue payload validation', () => {
 	test('supports TypeBox UUID formats for typed job payloads', () => {
