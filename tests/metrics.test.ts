@@ -101,6 +101,25 @@ describe('worker.metrics() — 0.1.0', () => {
 });
 
 describe('worker.drain() — 0.1.0', () => {
+	it('resumes claims explicitly after an operator drain', async () => {
+		const store = createInMemoryJobStore(jobs);
+		await store.enqueue({
+			kind: 'math.add',
+			payload: { left: 1, right: 2 }
+		});
+		let calls = 0;
+		const worker = createQueueWorker({
+			registry: createJobRegistry(jobs).on('math.add', async () => {
+				calls += 1;
+			}),
+			store
+		});
+		worker.drain();
+		expect(await worker.runOnce()).toBe(0);
+		worker.resume();
+		expect(await worker.runOnce()).toBe(1);
+		expect(calls).toBe(1);
+	});
 	it('refuses new claims after drain but keeps polling for reaps', async () => {
 		const store = createInMemoryJobStore(jobs);
 		const registry = createJobRegistry(jobs).on('math.add', () => {});

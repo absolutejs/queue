@@ -156,6 +156,7 @@ export type CreateQueueWorkerOptions<Jobs extends JobMap> = {
 
 export type QueueWorker = {
 	runOnce: () => Promise<number>;
+	resume: () => void;
 	start: () => void;
 	stop: () => Promise<void>;
 	/**

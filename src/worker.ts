@@ -250,6 +250,9 @@ export const createQueueWorker = <Jobs extends JobMap>({
 			draining = true;
 		},
 		metrics,
+		resume: () => {
+			draining = false;
+		},
 		runOnce: tick,
 		start: () => {
 			if (running) return;
