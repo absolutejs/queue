@@ -25,7 +25,7 @@ export const manifest = defineManifest<
 	QueuePluginOptions<JobMap>,
 	JobStore<JobMap>
 >()({
-	contract: 1,
+	contract: 2,
 	identity: {
 		accent: '#8b5cf6',
 		category: 'infrastructure',
@@ -91,6 +91,16 @@ export const manifest = defineManifest<
 	},
 	tools: {
 		enqueue_job: tool.runtime({
+			annotations: { idempotentHint: true },
+			authorization: {
+				approval: 'policy',
+				audience: 'admin',
+				effects: ['write'],
+				idempotency: { mode: 'host' },
+				requiredScopes: ['queue:write'],
+				resource: { type: 'queue-job' },
+				reversible: false
+			},
 			description:
 				'Add a job to the queue. `kind` must be one of the job kinds this app defines; `payload` must match that kind’s schema (invalid payloads are rejected). Use `runAtMs` to delay the job and `idempotencyKey` to dedupe repeat enqueues.',
 			handler: async (
@@ -125,6 +135,12 @@ export const manifest = defineManifest<
 		}),
 		job_stats: tool.runtime({
 			annotations: { readOnlyHint: true },
+			authorization: {
+				approval: 'never',
+				audience: 'admin',
+				effects: ['read'],
+				requiredScopes: ['queue:read']
+			},
 			description:
 				'Count jobs by status (pending, claimed, done, dead, canceled). Not every store supports counting.',
 			handler: async (_input, store) =>
@@ -135,6 +151,12 @@ export const manifest = defineManifest<
 		}),
 		list_jobs: tool.runtime({
 			annotations: { readOnlyHint: true },
+			authorization: {
+				approval: 'never',
+				audience: 'admin',
+				effects: ['read'],
+				requiredScopes: ['queue:read']
+			},
 			description:
 				'List jobs, optionally filtered by kind and/or status. Not every store supports listing.',
 			handler: async ({ kind, limit, status }, store) => {
@@ -162,6 +184,16 @@ export const manifest = defineManifest<
 			})
 		}),
 		retry_job: tool.runtime({
+			annotations: { idempotentHint: true },
+			authorization: {
+				approval: 'policy',
+				audience: 'admin',
+				effects: ['write'],
+				idempotency: { mode: 'resource' },
+				requiredScopes: ['queue:write'],
+				resource: { idField: 'id', type: 'queue-job' },
+				reversible: false
+			},
 			description:
 				'Re-run one failed or dead-lettered job by id. Returns whether the job was requeued. Not every store supports retrying.',
 			handler: async ({ id }, store) => {
