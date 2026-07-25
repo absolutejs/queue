@@ -5,8 +5,8 @@
     "": {
       "name": "@absolutejs/queue",
       "dependencies": {
-        "@absolutejs/manifest": "^0.7.1",
-        "@absolutejs/telemetry": "^0.1.1",
+        "@absolutejs/manifest": "^0.7.2",
+        "@absolutejs/telemetry": "^0.2.0",
         "@sinclair/typebox": "^0.34.0",
       },
       "devDependencies": {
@@ -24,7 +24,7 @@
   "packages": {
     "@absolutejs/absolute": ["@absolutejs/absolute@0.19.0-beta.1051", "", { "dependencies": { "@elysiajs/openapi": "^1.4.15", "@elysiajs/server-timing": "^1.4.0", "@elysiajs/static": "^1.4.0", "zustand": "^5.0.12" }, "optionalDependencies": { "@absolutejs/native-darwin-arm64": "0.19.0-beta.1008", "@absolutejs/native-darwin-x64": "0.19.0-beta.1008", "@absolutejs/native-linux-arm64": "0.19.0-beta.1008", "@absolutejs/native-linux-x64": "0.19.0-beta.1008", "@absolutejs/native-windows-arm64": "0.19.0-beta.1008", "@absolutejs/native-windows-x64": "0.19.0-beta.1008" }, "peerDependencies": { "@angular/animations": "^21.0.0", "@angular/common": "^21.0.0", "@angular/compiler": "^21.0.0", "@angular/compiler-cli": "^21.0.0", "@angular/core": "^21.0.0", "@angular/platform-browser": "^21.0.0", "@angular/platform-server": "^21.0.0", "@angular/router": "^21.0.0", "@angular/ssr": "^21.0.0", "@vue/compiler-sfc": "^3.5.27", "elysia": "^1.4.0", "less": "^4.6.0", "postcss": "^8.5.0", "react": "^19.2.0", "react-dom": "^19.2.0", "react-router": "^7.0.0", "rxjs": "^7.8.0", "sass": "^1.99.0", "sharp": ">=0.33.0", "stylus": "^0.64.0", "svelte": "^5.35.2", "tailwindcss": "^4.1.0", "typescript": "^5.9.3", "vue": "^3.5.27" }, "optionalPeers": ["@angular/animations", "@angular/common", "@angular/compiler", "@angular/compiler-cli", "@angular/core", "@angular/platform-browser", "@angular/platform-server", "@angular/router", "@angular/ssr", "@vue/compiler-sfc", "less", "postcss", "react", "react-dom", "react-router", "rxjs", "sass", "sharp", "stylus", "svelte", "tailwindcss", "typescript", "vue"], "bin": { "absolute": "dist/cli/index.js" } }, "sha512-HIsTygZDmr1EbQkLPUuW63efZze1f7qN2ZC4qxEAUcKgCbQKX4+7RSdD4FzVd0jiqtZsr9JpSS0x0/rzSyLMUQ=="],
 
-    "@absolutejs/manifest": ["@absolutejs/manifest@0.7.1", "", { "peerDependencies": { "@sinclair/typebox": ">=0.34.0 <0.35.0" }, "bin": { "absolute-manifest": "dist/cli.js" } }, "sha512-xlS8mbXvYk1k6ueI4aCflSqpSU78P0gEO56zc0kl/CVoa2iZ2qaTBONrhiaaM1aM+5zBbqlp5i8E4BiONhcKog=="],
+    "@absolutejs/manifest": ["@absolutejs/manifest@0.7.2", "", { "peerDependencies": { "@sinclair/typebox": ">=0.34.0 <0.35.0" }, "bin": { "absolute-manifest": "dist/cli.js" } }, "sha512-NSVzC4yHbH+n+WCNdWYrpbc+3k5rOfO4X85Ku9VCP8teRaa2VEibp29Cyvg9rQARUGaQjGGTz+l+APqM0+odxg=="],
 
     "@absolutejs/native-darwin-arm64": ["@absolutejs/native-darwin-arm64@0.19.0-beta.1008", "", { "os": "darwin", "cpu": "arm64" }, "sha512-bztRSnYXrD2O5UL9IUTP/Bc2Pd36sxmEd8elxjBPkgcB4iW9RmGUhCBGOMvGTKuEzHjWaJVVa1na6L9q12AxdA=="],
 
@@ -38,7 +38,7 @@
 
     "@absolutejs/native-windows-x64": ["@absolutejs/native-windows-x64@0.19.0-beta.1008", "", { "os": "win32", "cpu": "x64" }, "sha512-mXIL6AzV0gznwXz6gF+dtT4DIwxKMriF+WYxcjAPlf4xWD0S3ZS8jafHwQXi0RJn0pIX4TIIOhRz0JnVlka3zA=="],
 
-    "@absolutejs/telemetry": ["@absolutejs/telemetry@0.1.1", "", {}, "sha512-NcwsZytPOVQSnksYVofmvdDNqIwIJLbUmAMAZD5v2gLy98JgtvEmR1kHGNIXGAZgHA4rqofQt7PZlVCCwlx2mQ=="],
+    "@absolutejs/telemetry": ["@absolutejs/telemetry@0.2.0", "", {}, "sha512-4Xh9lShoa1QrSvzRRjIR/5h5pqed60Wc6SLliCkoGjZd8XOtQM3tP4aKTA3LgQ22tUDmxpcZitRzuDU9dMX9Fw=="],
 
     "@borewit/text-codec": ["@borewit/text-codec@0.2.2", "", {}, "sha512-DDaRehssg1aNrH4+2hnj1B7vnUGEjU6OIlyRdkMd0aUdIUvKXrJfXsy8LVtXAy7DRvYVluWbMspsRhz2lcW0mQ=="],
 
