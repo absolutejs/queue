@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.2 — 2026-08-07
+
+- Accepts the shared `@absolutejs/telemetry` 0.3 runtime line.
+
 All notable changes to `@absolutejs/queue` are recorded here. The format is
 loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This package is pre-1.0 — minor bumps may carry breaking changes; we'll call
