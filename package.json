@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/queue",
-  "version": "0.7.1",
+  "version": "0.8.0",
 	"description": "A durable, typed job queue for Elysia and the AbsoluteJS ecosystem",
 	"repository": {
 		"type": "git",
@@ -17,19 +17,7 @@
 	"license": "BSL-1.1",
 	"author": "Alex Kahn",
 	"absolutejs": {
-		"manifestContract": 2,
-		"runtimePeers": {
-			"elysia": {
-				"artifactImports": [
-					"elysia"
-				],
-				"buildExternals": [
-					"elysia"
-				],
-				"range": ">=1.4.29 <2",
-				"tested": "1.4.29"
-			}
-		}
+		"manifestContract": 2
 	},
 	"publishConfig": {
 		"access": "public"
@@ -52,17 +40,19 @@
 		"release": "bun run format && bun run build && bun publish"
 	},
 	"dependencies": {
-    "@absolutejs/manifest": "^0.7.2",
+    "@absolutejs/manifest": "^0.9.0",
     "@absolutejs/telemetry": "^0.2.0",
-		"@sinclair/typebox": "^0.34.0"
+		"@sinclair/typebox": "^0.34.0",
+		"typebox": "1.3.16"
 	},
 	"peerDependencies": {
-		"elysia": ">=1.4.29 <2"
+		"elysia": "^2.0.0-beta.6"
 	},
 	"devDependencies": {
-		"@absolutejs/absolute": "^0.19.0-beta.1051",
+		"@absolutejs/absolute": "^0.20.0-beta.0",
 		"@types/bun": "1.2.9",
-		"elysia": "1.4.29",
+		"elysia": "2.0.0-beta.6",
+		"exact-mirror": "1.2.4",
 		"prettier": "3.5.3",
 		"typescript": "5.8.3"
 	},

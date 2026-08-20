@@ -1,14 +1,14 @@
-import { FormatRegistry, type TSchema } from '@sinclair/typebox';
-import { TypeCompiler, type TypeCheck } from '@sinclair/typebox/compiler';
+import type { TSchema } from 'typebox';
+import { Compile, type Validator } from 'typebox/compile';
+import { Format } from 'typebox/format';
 import type { JobDefinition } from './types';
 
 const UUID_FORMAT =
 	/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
-if (!FormatRegistry.Has('uuid'))
-	FormatRegistry.Set('uuid', (value) => UUID_FORMAT.test(value));
+if (!Format.Has('uuid')) Format.Set('uuid', (value) => UUID_FORMAT.test(value));
 
-export type JobValidators = Map<string, TypeCheck<TSchema>>;
+export type JobValidators = Map<string, Validator<Record<PropertyKey, never>, TSchema>>;
 
 export class QueuePayloadValidationError extends Error {
 	readonly issues: string[];
@@ -47,25 +47,25 @@ export const compileJobValidators = (
 	const validators: JobValidators = new Map();
 	for (const kind of Object.keys(definition)) {
 		const schema = definition[kind];
-		if (schema) validators.set(kind, TypeCompiler.Compile(schema));
+		if (schema) validators.set(kind, Compile(schema));
 	}
 
 	return validators;
 };
 
 export const collectPayloadIssues = (
-	validator: TypeCheck<TSchema> | undefined,
+	validator: Validator<Record<PropertyKey, never>, TSchema> | undefined,
 	payload: unknown
 ): string[] | null => {
 	if (!validator || validator.Check(payload)) return null;
 
 	return [...validator.Errors(payload)].map(
-		(error) => `${error.path || '/'} ${error.message}`
+		(error) => `${error.instancePath || '/'} ${error.message}`
 	);
 };
 
 export const assertValidPayload = (
-	validator: TypeCheck<TSchema> | undefined,
+	validator: Validator<Record<PropertyKey, never>, TSchema> | undefined,
 	kind: string,
 	payload: unknown
 ) => {

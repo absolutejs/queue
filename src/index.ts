@@ -1,5 +1,5 @@
-export { Type as t } from '@sinclair/typebox';
-export type { Static, TSchema } from '@sinclair/typebox';
+export { Type as t } from 'typebox';
+export type { Static, TSchema } from 'typebox';
 export { exponentialBackoff } from './backoff';
 export type { ExponentialBackoffOptions } from './backoff';
 export {

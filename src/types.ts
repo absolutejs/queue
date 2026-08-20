@@ -1,4 +1,4 @@
-import type { Static, TSchema } from '@sinclair/typebox';
+import type { Static, TSchema } from 'typebox';
 import type { TracerProvider } from '@absolutejs/telemetry';
 
 export type JobId = `${string}-${string}-${string}-${string}-${string}`;

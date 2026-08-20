@@ -1,4 +1,4 @@
-import { TypeCompiler } from '@sinclair/typebox/compiler';
+import { Compile } from 'typebox/compile';
 import { ABS_ATTRS, tracerOrNoop } from '@absolutejs/telemetry';
 import { exponentialBackoff } from './backoff';
 import {
@@ -59,7 +59,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	const validators: JobValidators = new Map();
 	for (const kind of registry.kinds()) {
 		const schema = registry.getSchema(kind);
-		if (schema) validators.set(String(kind), TypeCompiler.Compile(schema));
+		if (schema) validators.set(String(kind), Compile(schema));
 	}
 
 	const runJob = async (job: Job<Jobs>) => {

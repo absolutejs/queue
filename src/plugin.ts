@@ -54,10 +54,10 @@ export const queue = <Jobs extends JobMap>({
 
 	return new Elysia({ name: '@absolutejs/queue' })
 		.decorate('queue', decorator)
-		.onStart(() => {
+		.setup(() => {
 			if (runWorker) worker.start();
 		})
-		.onStop(async () => {
+		.cleanup(async () => {
 			if (runWorker) await worker.stop();
 		});
 };

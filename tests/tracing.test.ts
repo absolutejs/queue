@@ -1,4 +1,4 @@
-import { Type as t } from '@sinclair/typebox';
+import { Type as t } from 'typebox';
 import { describe, expect, it } from 'bun:test';
 import {
 	ABS_ATTRS,
