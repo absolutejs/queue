@@ -6,7 +6,7 @@
       "name": "@absolutejs/queue",
       "dependencies": {
         "@absolutejs/manifest": "^0.9.0",
-        "@absolutejs/telemetry": "^0.2.0",
+        "@absolutejs/telemetry": ">=0.2.0 <0.4.0",
         "@sinclair/typebox": "^0.34.0",
         "typebox": "1.3.16",
       },
