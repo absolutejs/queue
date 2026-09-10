@@ -1,6 +1,6 @@
 {
 	"name": "@absolutejs/queue",
-  "version": "0.8.1",
+	"version": "0.8.1",
 	"description": "A durable, typed job queue for Elysia and the AbsoluteJS ecosystem",
 	"repository": {
 		"type": "git",
@@ -37,11 +37,12 @@
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"format": "prettier --write \"./**/*.{ts,json,md}\"",
-		"release": "bun run format && bun run build && bun publish"
+		"release": "bun run format && bun run build && bun publish",
+		"check:package": "absolute-changelog check"
 	},
 	"dependencies": {
-    "@absolutejs/manifest": "^0.9.0",
-    "@absolutejs/telemetry": ">=0.2.0 <0.4.0",
+		"@absolutejs/manifest": "^0.9.0",
+		"@absolutejs/telemetry": ">=0.2.0 <0.4.0",
 		"@sinclair/typebox": "^0.34.0",
 		"typebox": "1.3.16"
 	},
@@ -50,6 +51,7 @@
 	},
 	"devDependencies": {
 		"@absolutejs/absolute": "^0.20.0-beta.0",
+		"@absolutejs/changelog": "^0.1.2",
 		"@types/bun": "1.2.9",
 		"elysia": "2.0.0-beta.6",
 		"exact-mirror": "1.2.4",
@@ -70,7 +72,9 @@
 		"./manifest.json": "./dist/manifest.json"
 	},
 	"files": [
-		"dist",
-		"README.md"
+		"CHANGELOG.md",
+		"README.md",
+		"changelog.json",
+		"dist"
 	]
 }
