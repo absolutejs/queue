@@ -17,6 +17,8 @@ export type JobMapFromDefinition<Def extends JobDefinition> = {
 };
 
 export type Job<Jobs extends JobMap, Kind extends keyof Jobs = keyof Jobs> = {
+	/** Unique ownership token for this claim; never reuse across claims. */
+	claimToken?: string;
 	attempts: number;
 	createdAt: number;
 	id: JobId;
@@ -41,6 +43,7 @@ export type EnqueueInput<Jobs extends JobMap, Kind extends keyof Jobs> = {
 };
 
 export type JobContext<Jobs extends JobMap, Kind extends keyof Jobs> = {
+	claimToken?: string;
 	attempts: number;
 	id: JobId;
 	kind: Kind;
@@ -88,6 +91,13 @@ export type JobStore<Jobs extends JobMap> = {
 	cancel?: (id: JobId) => Promise<boolean>;
 	claimDue: (options: ClaimDueOptions) => Promise<Job<Jobs>[]>;
 	complete: (id: JobId) => Promise<void>;
+	/** Compare-and-set completion; false means this attempt no longer owns the job. */
+	completeClaim?: (id: JobId, claimToken: string) => Promise<boolean>;
+	failClaim?: (
+		id: JobId,
+		claimToken: string,
+		options: FailOptions
+	) => Promise<boolean>;
 	countByStatus?: () => Promise<Record<JobStatus, number>>;
 	enqueue: <Kind extends keyof Jobs>(
 		input: EnqueueInput<Jobs, Kind>
@@ -135,6 +145,8 @@ export type CreateQueueWorkerOptions<Jobs extends JobMap> = {
 		| number
 		| ((kind: keyof Jobs & string) => number | undefined);
 	leaseMs?: number;
+	/** Refuse stores without atomic claim-fenced completion and failure. */
+	requireClaimFencing?: boolean;
 	onError?: (error: unknown, job?: Job<Jobs>) => void;
 	pollIntervalMs?: number;
 	registry: JobRegistry<Jobs>;

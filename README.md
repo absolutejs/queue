@@ -242,3 +242,17 @@ skip validation, or a pre-compiled `JobValidators` for hot loops).
 ## License
 
 BSL-1.1 — see [LICENSE](./LICENSE). Converts to Apache 2.0 on the Change Date per the license terms.
+
+### Claim ownership and expired workers
+
+Stores can expose `completeClaim(id, claimToken)` and
+`failClaim(id, claimToken, options)`, returning `false` when that attempt no
+longer owns the claimed job. The worker uses these methods automatically when
+both are present, and the in-memory store supplies a fresh token for every claim.
+Use `requireClaimFencing: true` for durable processing that must refuse a legacy
+store without atomic claim checks. `JobContext.claimToken` lets handlers fence
+application checkpoint/result writes against the same attempt.
+
+This protects queue state. It does not undo external effects or stop a handler
+that ignores cancellation. Handlers must honor `signal` and use application
+ownership/attempt checks or durable effect receipts for their own writes.

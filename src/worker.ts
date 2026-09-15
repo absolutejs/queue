@@ -10,6 +10,7 @@ import type {
 	CreateQueueWorkerOptions,
 	Job,
 	JobMap,
+	FailOptions,
 	QueueWorker,
 	QueueWorkerMetrics
 } from './types';
@@ -28,10 +29,16 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	onError,
 	pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 	registry,
+	requireClaimFencing = false,
 	store,
 	tracerProvider,
 	workerId = crypto.randomUUID()
 }: CreateQueueWorkerOptions<Jobs>): QueueWorker => {
+	const fenced = Boolean(store.completeClaim && store.failClaim);
+	if (requireClaimFencing && !fenced)
+		throw new Error(
+			'This worker requires a store with atomic claim fencing'
+		);
 	// 0.2.0: OTel tracer (noop when tracerProvider unset).
 	const tracer = tracerOrNoop(tracerProvider, '@absolutejs/queue');
 	const resolveTimeoutMs = (kind: keyof Jobs & string) =>
@@ -63,6 +70,21 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	}
 
 	const runJob = async (job: Job<Jobs>) => {
+		if (fenced && !job.claimToken)
+			throw new Error(
+				'The fenced store returned a job without a claim token'
+			);
+		const complete = async () => {
+			if (fenced) return store.completeClaim!(job.id, job.claimToken!);
+			await store.complete(job.id);
+			return true;
+		};
+		const fail = async (options: FailOptions) => {
+			if (fenced)
+				return store.failClaim!(job.id, job.claimToken!, options);
+			await store.fail(job.id, options);
+			return true;
+		};
 		// 0.2.0: per-job span. The span lifetime IS the job's handler
 		// invocation — fail / retry / dead-letter all reflected in
 		// status + recorded exception.
@@ -79,10 +101,13 @@ export const createQueueWorker = <Jobs extends JobMap>({
 		try {
 			const handler = registry.getHandler(job.kind);
 			if (!handler) {
-				await store.fail(job.id, {
-					dead: true,
-					error: `No handler registered for kind "${String(job.kind)}"`
-				});
+				if (
+					!(await fail({
+						dead: true,
+						error: `No handler registered for kind "${String(job.kind)}"`
+					}))
+				)
+					return;
 				failed += 1;
 				deadLettered += 1;
 
@@ -94,10 +119,13 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				job.payload
 			);
 			if (issues) {
-				await store.fail(job.id, {
-					dead: true,
-					error: `Payload validation failed: ${issues.join('; ')}`
-				});
+				if (
+					!(await fail({
+						dead: true,
+						error: `Payload validation failed: ${issues.join('; ')}`
+					}))
+				)
+					return;
 				failed += 1;
 				deadLettered += 1;
 				onError?.(
@@ -113,6 +141,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 			let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
 			try {
 				const run = handler(job.payload, {
+					claimToken: job.claimToken,
 					attempts: job.attempts,
 					id: job.id,
 					kind: job.kind,
@@ -141,7 +170,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				} else {
 					await run;
 				}
-				await store.complete(job.id);
+				if (!(await complete())) return;
 				completed += 1;
 				span.setStatus({ code: 1 /* OK */ });
 			} catch (error) {
@@ -151,14 +180,17 @@ export const createQueueWorker = <Jobs extends JobMap>({
 
 				const isDead = attempt >= job.maxAttempts;
 				if (isDead) {
-					await store.fail(job.id, { dead: true, error: message });
+					if (!(await fail({ dead: true, error: message }))) return;
 					failed += 1;
 					deadLettered += 1;
 				} else {
-					await store.fail(job.id, {
-						error: message,
-						retryAt: Date.now() + backoff(attempt)
-					});
+					if (
+						!(await fail({
+							error: message,
+							retryAt: Date.now() + backoff(attempt)
+						}))
+					)
+						return;
 					retried += 1;
 				}
 

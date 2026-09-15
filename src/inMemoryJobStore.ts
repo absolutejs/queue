@@ -59,6 +59,7 @@ export const createInMemoryJobStore = <const Def extends JobDefinition>(
 			return due.map((job) => {
 				const claimed: Job<Jobs> = {
 					...job,
+					claimToken: crypto.randomUUID(),
 					lockedAt: now,
 					lockedBy: workerId,
 					status: 'claimed',
@@ -68,6 +69,45 @@ export const createInMemoryJobStore = <const Def extends JobDefinition>(
 
 				return cloneJob(claimed);
 			});
+		},
+		completeClaim: async (id, claimToken) => {
+			const job = jobs.get(id);
+			if (
+				!job ||
+				job.status !== 'claimed' ||
+				job.claimToken !== claimToken
+			)
+				return false;
+			jobs.set(id, {
+				...job,
+				claimToken: undefined,
+				lockedAt: undefined,
+				lockedBy: undefined,
+				status: 'done',
+				updatedAt: Date.now()
+			});
+			return true;
+		},
+		failClaim: async (id, claimToken, { dead, error, retryAt }) => {
+			const job = jobs.get(id);
+			if (
+				!job ||
+				job.status !== 'claimed' ||
+				job.claimToken !== claimToken
+			)
+				return false;
+			jobs.set(id, {
+				...job,
+				claimToken: undefined,
+				attempts: job.attempts + 1,
+				lastError: error,
+				lockedAt: undefined,
+				lockedBy: undefined,
+				runAt: retryAt ?? job.runAt,
+				status: dead ? 'dead' : 'pending',
+				updatedAt: Date.now()
+			});
+			return true;
 		},
 		complete: async (id) => {
 			const job = jobs.get(id);
