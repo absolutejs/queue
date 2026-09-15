@@ -34,7 +34,7 @@ describe('claim ownership fencing', () => {
 			})
 		).toBe(false);
 		expect((await store.get!(id))!.status).toBe('claimed');
-		expect((await store.get!(id))!.attempts).toBe(0);
+		expect((await store.get!(id))!.attempts).toBe(1);
 		expect(await store.completeClaim!(id, second!.claimToken!)).toBe(true);
 		expect(
 			await store.failClaim!(id, second!.claimToken!, {
@@ -78,7 +78,7 @@ describe('claim ownership fencing', () => {
 			expect(typeof newer!.claimToken).toBe('string');
 			expect(current!.claimToken).toBe(newer!.claimToken!);
 			expect(current!.status).toBe('claimed');
-			expect(current!.attempts).toBe(0);
+			expect(current!.attempts).toBe(1);
 			expect(worker.metrics().completed).toBe(0);
 		});
 	}
@@ -105,5 +105,26 @@ describe('claim ownership fencing', () => {
 				requireClaimFencing: true
 			})
 		).toThrow('requires a store with atomic claim fencing');
+	});
+	test('repeated process death consumes the retry budget', async () => {
+		const store = createInMemoryJobStore(jobs);
+		const id = await store.enqueue({
+			kind: 'process',
+			payload: {},
+			runAt: 1,
+			maxAttempts: 1
+		});
+		const [claim] = await store.claimDue({
+			now: 10,
+			limit: 1,
+			workerId: 'crashed'
+		});
+		await store.reapStuck({ now: 11, leaseMs: 1 });
+		expect((await store.get!(id))!.status).toBe('dead');
+		expect((await store.get!(id))!.attempts).toBe(1);
+		expect(
+			await store.claimDue({ now: 12, limit: 1, workerId: 'replacement' })
+		).toEqual([]);
+		expect(await store.completeClaim!(id, claim!.claimToken!)).toBe(false);
 	});
 });

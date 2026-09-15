@@ -213,9 +213,15 @@ export const createInMemoryJobStore = <const Def extends JobDefinition>(
 				) {
 					jobs.set(job.id, {
 						...job,
+						claimToken: undefined,
+						attempts: job.attempts + 1,
+						lastError: 'Worker lease expired before completion.',
 						lockedAt: undefined,
 						lockedBy: undefined,
-						status: 'pending',
+						status:
+							job.attempts + 1 >= job.maxAttempts
+								? 'dead'
+								: 'pending',
 						updatedAt: now
 					});
 					reaped += 1;

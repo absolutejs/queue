@@ -256,3 +256,6 @@ application checkpoint/result writes against the same attempt.
 This protects queue state. It does not undo external effects or stop a handler
 that ignores cancellation. Handlers must honor `signal` and use application
 ownership/attempt checks or durable effect receipts for their own writes.
+
+Expired claims consume one attempt when reaped. Reaching `maxAttempts` moves the
+job to `dead` with a lease-expiry error instead of retrying it indefinitely.
