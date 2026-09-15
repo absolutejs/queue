@@ -75,7 +75,8 @@ describe('claim ownership fencing', () => {
 			else finish.resolve();
 			await running;
 			const current = await store.get!(id);
-			expect(current!.claimToken).toBe(newer!.claimToken);
+			expect(typeof newer!.claimToken).toBe('string');
+			expect(current!.claimToken).toBe(newer!.claimToken!);
 			expect(current!.status).toBe('claimed');
 			expect(current!.attempts).toBe(0);
 			expect(worker.metrics().completed).toBe(0);
