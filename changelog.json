@@ -6,6 +6,19 @@
 			"changes": [
 				{
 					"kind": "fixed",
+					"summary": "Republish the verified worker kind-routing fix after npm accepted 0.8.3 but left it unavailable and unlisted in staging",
+					"symbols": [
+						"createQueueWorker"
+					]
+				}
+			],
+			"date": "2026-09-16",
+			"version": "0.8.4"
+		},
+		{
+			"changes": [
+				{
+					"kind": "fixed",
 					"summary": "Keep jobs pending for workers with matching handlers using atomic kind-filtered claims and an optional strict adapter capability gate",
 					"symbols": [
 						"createQueueWorker",
