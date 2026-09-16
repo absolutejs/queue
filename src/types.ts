@@ -57,6 +57,8 @@ export type JobHandler<Jobs extends JobMap, Kind extends keyof Jobs> = (
 ) => Promise<void> | void;
 
 export type ClaimDueOptions = {
+	/** Claim only these kinds; an empty list claims nothing. Omitted means all kinds supported by the store definition. */
+	kinds?: readonly string[];
 	limit: number;
 	now: number;
 	workerId: string;
@@ -88,6 +90,8 @@ export type ReapStuckOptions = {
 // Required methods are the worker contract. Optional methods power
 // observability/admin tooling (createQueueRoutes) — stores may omit them.
 export type JobStore<Jobs extends JobMap> = {
+	/** The store filters kinds atomically before applying its claim limit. */
+	supportsKindFiltering?: true;
 	cancel?: (id: JobId) => Promise<boolean>;
 	claimDue: (options: ClaimDueOptions) => Promise<Job<Jobs>[]>;
 	complete: (id: JobId) => Promise<void>;
@@ -147,6 +151,8 @@ export type CreateQueueWorkerOptions<Jobs extends JobMap> = {
 	leaseMs?: number;
 	/** Refuse stores without atomic claim-fenced completion and failure. */
 	requireClaimFencing?: boolean;
+	/** Refuse stores that cannot isolate workers by registered handlers. */
+	requireKindFiltering?: boolean;
 	onError?: (error: unknown, job?: Job<Jobs>) => void;
 	pollIntervalMs?: number;
 	registry: JobRegistry<Jobs>;

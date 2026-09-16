@@ -259,3 +259,16 @@ ownership/attempt checks or durable effect receipts for their own writes.
 
 Expired claims consume one attempt when reaped. Reaching `maxAttempts` moves the
 job to `dead` with a lease-expiry error instead of retrying it indefinitely.
+
+### Workers with different job handlers
+
+Workers now pass their registered handler kinds to `claimDue`. Stores advertising
+`supportsKindFiltering: true` must apply that filter atomically **before** the
+claim limit; `kinds: []` claims nothing. The in-memory store supports this, and
+queue-postgres 0.1.7 additionally limits claims to its job definition. Enable
+`requireKindFiltering: true` to reject an adapter that ignores this contract.
+Custom adapters must implement the filter before advertising support.
+
+Upgrade every worker sharing a queue before introducing new job kinds. An old
+worker can still consume jobs it does not recognize until it is upgraded or
+stopped; upgrading a producer alone cannot change that older process.

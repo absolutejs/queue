@@ -30,6 +30,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
 	registry,
 	requireClaimFencing = false,
+	requireKindFiltering = false,
 	store,
 	tracerProvider,
 	workerId = crypto.randomUUID()
@@ -38,6 +39,10 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	if (requireClaimFencing && !fenced)
 		throw new Error(
 			'This worker requires a store with atomic claim fencing'
+		);
+	if (requireKindFiltering && !store.supportsKindFiltering)
+		throw new Error(
+			'This worker requires a store with atomic job kind filtering'
 		);
 	// 0.2.0: OTel tracer (noop when tracerProvider unset).
 	const tracer = tracerOrNoop(tracerProvider, '@absolutejs/queue');
@@ -231,6 +236,10 @@ export const createQueueWorker = <Jobs extends JobMap>({
 		}
 
 		const claimed = await store.claimDue({
+			kinds: registry
+				.kinds()
+				.filter((kind) => registry.getHandler(kind))
+				.map(String),
 			limit: capacity,
 			now: tickStart,
 			workerId

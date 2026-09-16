@@ -30,6 +30,7 @@ export const createInMemoryJobStore = <const Def extends JobDefinition>(
 	};
 
 	return {
+		supportsKindFiltering: true,
 		cancel: async (id) => {
 			const job = jobs.get(id);
 			if (
@@ -50,9 +51,15 @@ export const createInMemoryJobStore = <const Def extends JobDefinition>(
 
 			return true;
 		},
-		claimDue: async ({ limit, now, workerId }) => {
+		claimDue: async ({ kinds, limit, now, workerId }) => {
 			const due = [...jobs.values()]
-				.filter((job) => job.status === 'pending' && job.runAt <= now)
+				.filter(
+					(job) =>
+						job.status === 'pending' &&
+						job.runAt <= now &&
+						(kinds === undefined ||
+							kinds.includes(String(job.kind)))
+				)
 				.sort((left, right) => left.runAt - right.runAt)
 				.slice(0, limit);
 

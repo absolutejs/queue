@@ -5,6 +5,23 @@
 		{
 			"changes": [
 				{
+					"kind": "fixed",
+					"summary": "Keep jobs pending for workers with matching handlers using atomic kind-filtered claims and an optional strict adapter capability gate",
+					"symbols": [
+						"createQueueWorker",
+						"ClaimDueOptions",
+						"JobStore",
+						"CreateQueueWorkerOptions",
+						"createInMemoryJobStore"
+					]
+				}
+			],
+			"date": "2026-09-16",
+			"version": "0.8.3"
+		},
+		{
+			"changes": [
+				{
 					"kind": "added",
 					"summary": "Add atomic claim-fenced completion and failure, unique in-memory claim tokens and a strict worker capability gate so expired attempts cannot overwrite newer jobs",
 					"symbols": [
