@@ -1,5 +1,31 @@
 {
 	"contract": 1,
 	"name": "@absolutejs/queue",
-	"releases": []
+	"releases": [
+		{
+			"changes": [
+				{
+					"kind": "added",
+					"summary": "Add atomic claim-fenced completion and failure, unique in-memory claim tokens and a strict worker capability gate so expired attempts cannot overwrite newer jobs",
+					"symbols": [
+						"JobStore",
+						"JobContext",
+						"createQueueWorker",
+						"createInMemoryJobStore",
+						"CreateQueueWorkerOptions",
+						"Job"
+					]
+				},
+				{
+					"kind": "fixed",
+					"summary": "Count expired worker claims toward maxAttempts so repeated process death cannot retry a job indefinitely",
+					"symbols": [
+						"createInMemoryJobStore"
+					]
+				}
+			],
+			"date": "2026-09-16",
+			"version": "0.8.2"
+		}
+	]
 }
