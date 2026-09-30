@@ -70,3 +70,5 @@ export {
 export type { JobValidators } from './validation';
 export { createWakeScheduler, httpWake } from './wakeScheduler';
 export { createQueueWorker } from './worker';
+
+export { NonRetryableJobError } from './errors';

@@ -1,3 +1,4 @@
+import { NonRetryableJobError } from './errors';
 import { Compile } from 'typebox/compile';
 import { ABS_ATTRS, tracerOrNoop } from '@absolutejs/telemetry';
 import { exponentialBackoff } from './backoff';
@@ -183,7 +184,9 @@ export const createQueueWorker = <Jobs extends JobMap>({
 				const message =
 					error instanceof Error ? error.message : String(error);
 
-				const isDead = attempt >= job.maxAttempts;
+				const isDead =
+					error instanceof NonRetryableJobError ||
+					attempt >= job.maxAttempts;
 				if (isDead) {
 					if (!(await fail({ dead: true, error: message }))) return;
 					failed += 1;

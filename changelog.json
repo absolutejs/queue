@@ -5,6 +5,16 @@
 		{
 			"changes": [
 				{
+					"kind": "added",
+					"summary": "Add explicit non-retryable job failures preserving terminal errors without repeated execution"
+				}
+			],
+			"date": "2026-09-30",
+			"version": "0.9.0"
+		},
+		{
+			"changes": [
+				{
 					"kind": "fixed",
 					"summary": "Republish the verified worker kind-routing fix after npm accepted 0.8.3 but left it unavailable and unlisted in staging",
 					"symbols": [
