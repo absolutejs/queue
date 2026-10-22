@@ -52,12 +52,14 @@ export const queue = <Jobs extends JobMap>({
 		store
 	};
 
+	/* The worker follows the server's own start and stop: Elysia
+	 * 2.0.0-rc.0 removed the setup/cleanup lifecycle it ran on. */
 	return new Elysia({ name: '@absolutejs/queue' })
 		.decorate('queue', decorator)
-		.setup(() => {
+		.onStart(() => {
 			if (runWorker) worker.start();
 		})
-		.cleanup(async () => {
+		.onStop(async () => {
 			if (runWorker) await worker.stop();
 		});
 };
