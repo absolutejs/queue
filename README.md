@@ -272,3 +272,7 @@ Custom adapters must implement the filter before advertising support.
 Upgrade every worker sharing a queue before introducing new job kinds. An old
 worker can still consume jobs it does not recognize until it is upgraded or
 stopped; upgrading a producer alone cannot change that older process.
+
+### Deployment drain
+
+Call `worker.drain()` before retiring a process. It stops new claims while existing claims and handlers finish. Wait until both `worker.metrics().active` and `worker.metrics().claiming` are zero before terminating the process. `worker.stop()` waits for pending polls, database claims, and handlers itself. If deployment rolls back, `worker.resume()` permits claims again. Pending claims reserve concurrency so overlapping polls cannot overfill the worker.

@@ -5,6 +5,20 @@
 		{
 			"changes": [
 				{
+					"kind": "fixed",
+					"summary": "Wait for pending claims during worker shutdown and account for reserved concurrency",
+					"symbols": [
+						"createQueueWorker",
+						"QueueWorkerMetrics"
+					]
+				}
+			],
+			"date": "2026-10-25",
+			"version": "0.10.1"
+		},
+		{
+			"changes": [
+				{
 					"detail": "Elysia 2.0.0-rc.0 renamed every lifecycle hook to its `on` form and removed setup/cleanup (now onStart/onStop). This package now builds and tests against Elysia 2.0.0-rc.0 and requires `elysia ^2.0.0-rc.0`, which also accepts later release candidates and 2.0.0. The queue plugin now starts its worker in onStart and stops it in onStop (setup/cleanup were removed), so the worker follows the server's own start and stop.",
 					"kind": "breaking",
 					"migration": {

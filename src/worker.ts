@@ -53,6 +53,10 @@ export const createQueueWorker = <Jobs extends JobMap>({
 			: handlerTimeoutMs;
 	let running = false;
 	let active = 0;
+	let claiming = 0;
+	let reserved = 0;
+	let polling = 0;
+	let stopGeneration = 0;
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	// 0.1.0: operator-shaped metrics + drain state. All counters are
 	// cumulative since createQueueWorker().
@@ -226,41 +230,50 @@ export const createQueueWorker = <Jobs extends JobMap>({
 
 	const tick = async () => {
 		const tickStart = Date.now();
+		const generation = stopGeneration;
 		polls += 1;
-		reaped += await store.reapStuck({ leaseMs, now: tickStart });
-
-		// 0.1.0: while draining, skip claiming new jobs. In-flight handlers
-		// keep running; stuck-lease reaps continue. The polling loop only
-		// halts on stop().
-		const capacity = draining ? 0 : concurrency - active;
-		if (capacity <= 0) {
+		polling += 1;
+		try {
+			reaped += await store.reapStuck({ leaseMs, now: tickStart });
+			const capacity =
+				draining || generation !== stopGeneration
+					? 0
+					: concurrency - active - reserved;
+			if (capacity <= 0) return 0;
+			claiming += 1;
+			reserved += capacity;
+			let claimed;
+			try {
+				claimed = await store.claimDue({
+					kinds: registry
+						.kinds()
+						.filter((kind) => registry.getHandler(kind))
+						.map(String),
+					limit: capacity,
+					now: tickStart,
+					workerId
+				});
+			} finally {
+				claiming -= 1;
+				reserved -= capacity;
+			}
+			// Register handlers in the same synchronous continuation that clears
+			// claiming, so drain observers never see an idle gap after a claim.
+			await Promise.all(
+				claimed.map(async (job) => {
+					active += 1;
+					try {
+						await runJob(job);
+					} finally {
+						active -= 1;
+					}
+				})
+			);
+			return claimed.length;
+		} finally {
+			polling -= 1;
 			lastTickMs = Date.now() - tickStart;
-			return 0;
 		}
-
-		const claimed = await store.claimDue({
-			kinds: registry
-				.kinds()
-				.filter((kind) => registry.getHandler(kind))
-				.map(String),
-			limit: capacity,
-			now: tickStart,
-			workerId
-		});
-
-		await Promise.all(
-			claimed.map(async (job) => {
-				active += 1;
-				try {
-					await runJob(job);
-				} finally {
-					active -= 1;
-				}
-			})
-		);
-
-		lastTickMs = Date.now() - tickStart;
-		return claimed.length;
 	};
 
 	const loop = async () => {
@@ -278,6 +291,7 @@ export const createQueueWorker = <Jobs extends JobMap>({
 	const metrics = (): QueueWorkerMetrics => ({
 		active,
 		capacity: concurrency,
+		claiming,
 		completed,
 		deadLettered,
 		draining,
@@ -305,8 +319,9 @@ export const createQueueWorker = <Jobs extends JobMap>({
 		},
 		stop: async () => {
 			running = false;
+			stopGeneration += 1;
 			if (timer) clearTimeout(timer);
-			while (active > 0)
+			while (polling > 0 || active > 0)
 				await new Promise((resolve) => setTimeout(resolve, 10));
 		}
 	};

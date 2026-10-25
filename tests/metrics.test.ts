@@ -19,6 +19,7 @@ describe('worker.metrics() — 0.1.0', () => {
 		expect(m).toEqual({
 			active: 0,
 			capacity: 4,
+			claiming: 0,
 			completed: 0,
 			deadLettered: 0,
 			draining: false,

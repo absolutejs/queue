@@ -218,6 +218,8 @@ export type QueueWorker = {
  * `createQueueWorker()`. Added in 0.1.0.
  */
 export type QueueWorkerMetrics = {
+	/** Database claim requests still in flight; include with active when draining. */
+	claiming: number;
 	active: number;
 	capacity: number;
 	draining: boolean;
